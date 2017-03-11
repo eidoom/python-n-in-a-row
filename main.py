@@ -1,15 +1,74 @@
+#!/usr/bin/env python
 # coding=UTF-8
 
 from random import choice
+from copy import deepcopy
+from enum import Enum
 
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
 
-HUMAN = "human"
-AI = "ai"
-TIE = "tie"
 
-OUTCOMES = (HUMAN, AI, TIE)
+class Outcome(Enum):
+    HUMAN = "human"
+    AI = "ai"
+    TIE = "tie"
+
+    def congratulations(self):
+        return {Outcome.HUMAN: "Human wins.", Outcome.AI: "AI wins.", Outcome.TIE: "Tie."}[self]
+
+
+BLANK = " "
+CROSS = "X"
+NOUGHT = "O"
+BOARD_SQUARE = "[{}]"
+
+BOARD_SIDE_LENGTH = 3
+BOARD_SIZE = BOARD_SIDE_LENGTH ** 2
+
+POSITIONS = [[BOARD_SIDE_LENGTH * i + j for j in range(BOARD_SIDE_LENGTH)]
+             for i in range(BOARD_SIDE_LENGTH)]
+
+HORIZONTAL_LINES = [POSITIONS[i] for i in range(BOARD_SIDE_LENGTH)]
+VERTICAL_LINES = [[POSITIONS[i][j] for i in range(BOARD_SIDE_LENGTH)]
+                  for j in range(BOARD_SIDE_LENGTH)]
+DIAGONAL_LINE = [[POSITIONS[i][i] for i in range(BOARD_SIDE_LENGTH)]]
+ANTI_DIAGONAL_LINE = [[POSITIONS[i][BOARD_SIDE_LENGTH - 1 - i]
+                       for i in range(BOARD_SIDE_LENGTH)]]
+
+LINES = (HORIZONTAL_LINES + VERTICAL_LINES + DIAGONAL_LINE
+         + ANTI_DIAGONAL_LINE)
+
+ALL_LINES = LINES + [line[::-1] for line in LINES]
+
+
+class GameState:
+    def __init__(self, previous_state=None, move=None):
+        if previous_state is None:
+            self.state = [BLANK] * BOARD_SIZE
+            self.player = CROSS
+        else:
+            self.state = deepcopy(previous_state.state)
+            self.state[move] = previous_state.player
+            self.player = {CROSS: NOUGHT, NOUGHT: CROSS}[previous_state.player]
+
+    def print_board(self):
+        print(((BOARD_SQUARE * BOARD_SIDE_LENGTH + "\n") * BOARD_SIDE_LENGTH)
+              .format(*[self.state[i] for i in range(BOARD_SIZE)]))
+
+    def check_winner(self):
+        for [a, b, c] in LINES:
+            if self.state[a] is self.state[b] is self.state[c]:
+                return self.state[a]
+
+    def find_available(self):
+        if self.check_winner() in [NOUGHT, CROSS]:
+            return []
+        else:
+            return [i for i, x in enumerate(self.state) if x is BLANK]
+
+    def next_states(self):
+        return [GameState(self, move) for move in self.find_available()]
 
 
 def prompt_boolean(prompt):
@@ -24,121 +83,100 @@ def prompt_boolean(prompt):
             print("What?")
 
 
-class NInARow:
-    def __init__(self):
-        self.blank = " "
-        self.cross = "X"
-        self.nought = "O"
-        self.board_square = "[{}]"
+def take_turn_human(state):
+    while True:
+        try:
+            move = int(input("Your go: ")) - 1
 
-        self.board_side_length = 3
-        self.board_size = self.board_side_length ** 2
-
-        self.positions = [[self.board_side_length * i + j for j in range(self.board_side_length)]
-                          for i in range(self.board_side_length)]
-
-        self.horizontal_lines = [self.positions[i] for i in range(self.board_side_length)]
-        self.vertical_lines = [[self.positions[i][j] for i in range(self.board_side_length)]
-                               for j in range(self.board_side_length)]
-        self.diagonal_line = [[self.positions[i][i] for i in range(self.board_side_length)]]
-        self.anti_diagonal_line = [[self.positions[i][self.board_side_length - 1 - i]
-                                    for i in range(self.board_side_length)]]
-
-        self.lines = (self.horizontal_lines + self.vertical_lines + self.diagonal_line
-                      + self.anti_diagonal_line)
-
-        self.all_lines = self.lines + [line[::-1] for line in self.lines]
-
-        self.state = [self.blank] * self.board_size
-
-    def print_board(self):
-        print(((self.board_square * self.board_side_length + "\n") * self.board_side_length)
-              .format(*[self.state[i] for i in range(self.board_size)]))
-
-    def find_available(self):
-        return [i for i, x in enumerate(self.state) if x is self.blank]
-
-    def check_winner(self):
-        for [a, b, c] in self.lines:
-            if self.state[a] is self.state[b] is self.state[c]:
-                return self.state[a]
-
-    def check_game_over(self, winner):
-        return (not self.find_available()) or (winner in [self.nought, self.cross])
-
-    def take_turn_human(self, player):
-        while True:
-            try:
-                move = int(input("Your go: ")) - 1
-
-                if move in self.find_available():
-                    break
-            except ValueError:
-                print("Really?")
-
-        self.state[move] = player
-
-    def take_turn_ai(self, player):
-        print("AI's go:")
-        move = choice(self.find_available())
-
-        self.state[move] = player
+            if move in state.find_available():
+                return GameState(state, move)
+        except ValueError:
+            print("Really?")
 
 
-def play_round():
-    game = NInARow()
-    game.print_board()
+def min_play(state):
+    if state.is_gameover():
+        return evaluate(state)
+    moves = state.get_available_moves()
+    best_score = float('inf')
+    for move in moves:
+        clone = state.next_state(move)
+        score = max_play(clone)
+        if score < best_score:
+            best_move = move
+            best_score = score
+    return best_score
 
-    if prompt_boolean("Wanna start? "):
-        player_human = game.cross
-        player_ai = game.nought
-        turn_human = True
-    else:
-        player_human = game.nought
-        player_ai = game.cross
-        turn_human = False
+
+def max_play(state):
+    if state.is_gameover():
+        return evaluate(state)
+    moves = state.get_available_moves()
+    best_score = float('-inf')
+    for move in moves:
+        clone = state.next_state(move)
+        score = min_play(clone)
+        if score > best_score:
+            best_move = move
+            best_score = score
+    return best_score
+
+
+def minimax(state, player):
+    moves = state.find_available()
+    best_move = moves[0]
+    best_score = float('-inf')
+    for move in moves:
+        state = state.next_state(move, player)
+        score = min_play(state)
+        if score > best_score:
+            best_move = move
+            best_score = score
+    return best_move
+
+
+def take_turn_ai(state):
+    print("AI's go:")
+    return choice(state.next_states())
+
+
+def play_round(state, start_human):
+    (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
 
     while True:
-        if turn_human:
-            game.take_turn_human(player_human)
+        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state)
+        state.print_board()
 
-        else:
-            game.take_turn_ai(player_ai)
-
-        game.print_board()
-
-        winner = game.check_winner()
-
-        if game.check_game_over(winner):
+        if not state.find_available():
             break
 
-        turn_human = not turn_human
+    winner = state.check_winner()
 
-    if winner is player_human:
-        print("Human wins.")
-        return HUMAN
-    elif winner is player_ai:
-        print("AI wins.")
-        return AI
-    elif winner is None:
-        print("Tie.")
-        return TIE
+    return {player_human: Outcome.HUMAN, player_ai: Outcome.AI, None: Outcome.TIE}[winner]
 
 
 def play_game():
-    tallies = {HUMAN: 0, AI: 0, TIE: 0}
-    while True:
-        winner = play_round()
+    tallies = {outcome: 0 for outcome in Outcome}
 
-        for outcome in OUTCOMES:
+    while True:
+        state = GameState()
+        state.print_board()
+
+        start_human = prompt_boolean("Wanna start? ")
+
+        winner = play_round(state, start_human)
+
+        print(winner.congratulations())
+
+        for outcome in Outcome:
             if winner is outcome:
                 tallies[outcome] += 1
 
         if not prompt_boolean("\nPlay again? (Y/n): "):
-            print("\nHuman: {}\nAI:    {}\nTie:   {}"
-                  .format(*[tallies[outcome] for outcome in OUTCOMES]))
             break
 
+    print("\nHuman: {}\nAI:    {}\nTie:   {}"
+          .format(*[tallies[outcome] for outcome in Outcome]))
 
 if __name__ == "__main__":
     play_game()
