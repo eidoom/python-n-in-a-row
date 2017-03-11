@@ -5,30 +5,11 @@ from random import choice
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
 
-BLANK = " "
-CROSS = "X"
-NOUGHT = "O"
-BOARD_SQUARE = "[{}]"
+HUMAN = "human"
+AI = "ai"
+TIE = "tie"
 
-BOARD_SIDE_LENGTH = 3
-BOARD_SIZE = BOARD_SIDE_LENGTH ** 2
-
-POSITIONS = [[BOARD_SIDE_LENGTH * i + j for j in range(BOARD_SIDE_LENGTH)]
-             for i in range(BOARD_SIDE_LENGTH)]
-
-HORIZONTAL_LINES = [POSITIONS[i] for i in range(BOARD_SIDE_LENGTH)]
-VERTICAL_LINES = [[POSITIONS[i][j] for i in range(BOARD_SIDE_LENGTH)]
-                  for j in range(BOARD_SIDE_LENGTH)]
-DIAGONAL_LINE = [[POSITIONS[i][i] for i in range(BOARD_SIDE_LENGTH)]]
-ANTI_DIAGONAL_LINE = [[POSITIONS[i][BOARD_SIDE_LENGTH - 1 - i]
-                       for i in range(BOARD_SIDE_LENGTH)]]
-
-LINES = HORIZONTAL_LINES + VERTICAL_LINES + DIAGONAL_LINE + ANTI_DIAGONAL_LINE
-
-ALL_LINES = LINES + [line[::-1] for line in LINES]
-
-state = [BLANK] * BOARD_SIZE
-tallies = [0] * 3
+OUTCOMES = (HUMAN, AI, TIE)
 
 
 def prompt_boolean(prompt):
@@ -43,86 +24,119 @@ def prompt_boolean(prompt):
             print("What?")
 
 
-def print_board():
-    print(((BOARD_SQUARE * BOARD_SIDE_LENGTH + "\n") * BOARD_SIDE_LENGTH)
-          .format(*[state[i] for i in range(BOARD_SIZE)]))
+class NInARow:
+    def __init__(self):
+        self.blank = " "
+        self.cross = "X"
+        self.nought = "O"
+        self.board_square = "[{}]"
 
+        self.board_side_length = 3
+        self.board_size = self.board_side_length ** 2
 
-def find_available():
-    return [i for i, x in enumerate(state) if x is BLANK]
+        self.positions = [[self.board_side_length * i + j for j in range(self.board_side_length)]
+                          for i in range(self.board_side_length)]
 
+        self.horizontal_lines = [self.positions[i] for i in range(self.board_side_length)]
+        self.vertical_lines = [[self.positions[i][j] for i in range(self.board_side_length)]
+                               for j in range(self.board_side_length)]
+        self.diagonal_line = [[self.positions[i][i] for i in range(self.board_side_length)]]
+        self.anti_diagonal_line = [[self.positions[i][self.board_side_length - 1 - i]
+                                    for i in range(self.board_side_length)]]
 
-def check_winner():
-    for [a, b, c] in LINES:
-        if state[a] is state[b] is state[c]:
-            return state[a]
+        self.lines = (self.horizontal_lines + self.vertical_lines + self.diagonal_line
+                      + self.anti_diagonal_line)
 
+        self.all_lines = self.lines + [line[::-1] for line in self.lines]
 
-def take_turn_human(player):
-    while True:
-        try:
-            move = int(input("Your go: ")) - 1
+        self.state = [self.blank] * self.board_size
 
-            if move in find_available():
-                break
-        except ValueError:
-            print("Really?")
+    def print_board(self):
+        print(((self.board_square * self.board_side_length + "\n") * self.board_side_length)
+              .format(*[self.state[i] for i in range(self.board_size)]))
 
-    state[move] = player
+    def find_available(self):
+        return [i for i, x in enumerate(self.state) if x is self.blank]
 
+    def check_winner(self):
+        for [a, b, c] in self.lines:
+            if self.state[a] is self.state[b] is self.state[c]:
+                return self.state[a]
 
-def take_turn_ai(player):
-    print("AI's go:")
-    move = choice(find_available())
+    def check_game_over(self, winner):
+        return (not self.find_available()) or (winner in [self.nought, self.cross])
 
-    state[move] = player
+    def take_turn_human(self, player):
+        while True:
+            try:
+                move = int(input("Your go: ")) - 1
+
+                if move in self.find_available():
+                    break
+            except ValueError:
+                print("Really?")
+
+        self.state[move] = player
+
+    def take_turn_ai(self, player):
+        print("AI's go:")
+        move = choice(self.find_available())
+
+        self.state[move] = player
 
 
 def play_round():
-    print_board()
+    game = NInARow()
+    game.print_board()
 
     if prompt_boolean("Wanna start? "):
-        player_human = CROSS
-        player_ai = NOUGHT
+        player_human = game.cross
+        player_ai = game.nought
         turn_human = True
     else:
-        player_human = NOUGHT
-        player_ai = CROSS
+        player_human = game.nought
+        player_ai = game.cross
         turn_human = False
 
     while True:
         if turn_human:
-            take_turn_human(player_human)
+            game.take_turn_human(player_human)
 
         else:
-            take_turn_ai(player_ai)
+            game.take_turn_ai(player_ai)
 
-        print_board()
+        game.print_board()
 
-        winner = check_winner()
+        winner = game.check_winner()
 
-        if (not find_available()) or (winner in [NOUGHT, CROSS]):
+        if game.check_game_over(winner):
             break
 
         turn_human = not turn_human
 
     if winner is player_human:
-        tallies[0] += 1
         print("Human wins.")
+        return HUMAN
     elif winner is player_ai:
-        tallies[1] += 1
         print("AI wins.")
+        return AI
     elif winner is None:
-        tallies[2] += 1
         print("Tie.")
+        return TIE
 
 
 def play_game():
+    tallies = {HUMAN: 0, AI: 0, TIE: 0}
     while True:
-        play_round()
+        winner = play_round()
+
+        for outcome in OUTCOMES:
+            if winner is outcome:
+                tallies[outcome] += 1
 
         if not prompt_boolean("\nPlay again? (Y/n): "):
-            print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*tallies))
+            print("\nHuman: {}\nAI:    {}\nTie:   {}"
+                  .format(*[tallies[outcome] for outcome in OUTCOMES]))
             break
 
 
