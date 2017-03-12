@@ -130,8 +130,8 @@ def evaluate(state):
             None: TIE_SCORE}[state.check_winner()]
 
 
-# -----------------
-
+# ----------------- negamax, list comprehension
+#
 # def negamax_play(state):
 #     if state.check_game_over():
 #         return -evaluate(state)
@@ -143,7 +143,7 @@ def evaluate(state):
 #                 for board_state in state.get_next_states()],
 #                key=lambda x: x[1])[0]
 
-# -----------------
+# ----------------- negamax, map
 #
 # def negamax_play(state):
 #     if state.check_game_over():
@@ -155,7 +155,7 @@ def evaluate(state):
 #     return max(map(lambda board_state: (board_state, negamax_play(board_state)),
 #                    state.get_next_states()), key=lambda x: x[1])[0]
 
-# ---------------------
+# --------------------- minimax, concise, list comp.
 
 # def min_play(state):
 #     if state.check_game_over():
@@ -174,7 +174,56 @@ def evaluate(state):
 #                 for board_state in state.get_next_states()],
 #                key=lambda x: x[1])[0]
 
-# ------------------------
+# ------------------------ negamax, alpha-beta, fail-hard
+#
+# def negamax_play(alpha, beta, state):
+#     if state.check_game_over():
+#         return evaluate(state), state
+#     states = state.get_next_states()
+#     best_state = states[0]
+#     for state in states:
+#         score = -negamax_play(-beta, -alpha, state)[0]
+#         if score >= beta:
+#             return beta, state
+#         elif score > alpha:
+#             alpha = score
+#             best_state = state
+#     return alpha, best_state
+#
+#
+# def minimax(state):
+#     alpha = -INF
+#     beta = INF
+#     state = negamax_play(alpha, beta, state)[1]
+#     return state
+
+# ------------------------ negamax, alpha-beta, fail-soft
+
+def negamax_play(alpha, beta, state):
+    if state.check_game_over():
+        return evaluate(state), state
+    states = state.get_next_states()
+    best_state = states[0]
+    best_score = -INF
+    for state in states:
+        score = -negamax_play(-beta, -alpha, state)[0]
+        if score >= beta:
+            return score, state
+        elif score > best_score:
+            best_score = score
+            if score > alpha:
+                alpha = score
+                best_state = state
+    return best_score, best_state
+
+
+def minimax(state):
+    alpha = -INF
+    beta = INF
+    state = negamax_play(alpha, beta, state)[1]
+    return state
+
+# ------------------------ minimax, standard
 
 # def min_play(state):
 #     if state.check_game_over():
@@ -213,47 +262,47 @@ def evaluate(state):
 #             best_score = score
 #     return best_state
 
-# -------------------------
-
-def min_play(alpha, beta, state):
-    if state.check_game_over():
-        return -evaluate(state), state
-    else:
-        states = state.get_next_states()
-        best_state = states[0]
-        for state in states:
-            score = max_play(alpha, beta, state)[0]
-            if score <= alpha:
-                return alpha, state
-            elif score < beta:
-                best_state = state
-                beta = score
-        return beta, best_state
-
-
-def max_play(alpha, beta, state):
-    if state.check_game_over():
-        return evaluate(state), state
-    else:
-        states = state.get_next_states()
-        best_state = states[0]
-        for state in states:
-            score = min_play(alpha, beta, state)[0]
-            if score >= beta:
-                return beta, state
-            elif score > alpha:
-                best_state = state
-                alpha = score
-        return alpha, best_state
-
-
-def minimax(state):
-    alpha = -INF
-    beta = INF
-    state = min_play(alpha, beta, state)[1]
-    return state
-
-
+# ------------------------- minimax, alpha-beta
+#
+# def min_play(alpha, beta, state):
+#     if state.check_game_over():
+#         return -evaluate(state), state
+#     else:
+#         states = state.get_next_states()
+#         best_state = states[0]
+#         for state in states:
+#             score = max_play(alpha, beta, state)[0]
+#             if score <= alpha:
+#                 return alpha, state
+#             elif score < beta:
+#                 best_state = state
+#                 beta = score
+#         return beta, best_state
+#
+#
+# def max_play(alpha, beta, state):
+#     if state.check_game_over():
+#         return evaluate(state), state
+#     else:
+#         states = state.get_next_states()
+#         best_state = states[0]
+#         for state in states:
+#             score = min_play(alpha, beta, state)[0]
+#             if score >= beta:
+#                 return beta, state
+#             elif score > alpha:
+#                 best_state = state
+#                 alpha = score
+#         return alpha, best_state
+#
+#
+# def minimax(state):
+#     alpha = -INF
+#     beta = INF
+#     state = min_play(alpha, beta, state)[1]
+#     return state
+#
+#
 # -------------------------
 
 
@@ -265,7 +314,8 @@ def take_turn_ai(state):
     return result
 
 
-# def take_turn_ai_random(state):
+# def take_turn_ai(state):
+#     from random import choice
 #     print("AI's go:")
 #     return choice(state.get_next_states())
 
