@@ -14,6 +14,8 @@ WIN_SCORE = 1
 TIE_SCORE = 0
 LOSE_SCORE = - WIN_SCORE
 
+INF = float('inf')
+
 BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
@@ -82,6 +84,9 @@ class GameState:
         else:
             return [i for i, x in enumerate(self.state) if x is BLANK]
 
+    def check_game_over(self):
+        return not self.find_available()
+
     def get_next_states(self):
         return [GameState(self, move) for move in self.find_available()]
 
@@ -116,16 +121,16 @@ def evaluate(state):
 
 # -----------------
 
-def negamax_play(state):
-    if not state.find_available():
-        return -evaluate(state)
-    return min([-negamax_play(board_state) for board_state in state.get_next_states()])
-
-
-def minimax(state):
-    return max([(board_state, negamax_play(board_state))
-                for board_state in state.get_next_states()],
-               key=lambda x: x[1])[0]
+# def negamax_play(state):
+#     if not state.find_available():
+#         return -evaluate(state)
+#     return min([-negamax_play(board_state) for board_state in state.get_next_states()])
+#
+#
+# def minimax(state):
+#     return max([(board_state, negamax_play(board_state))
+#                 for board_state in state.get_next_states()],
+#                key=lambda x: x[1])[0]
 
 # -----------------
 
@@ -159,43 +164,43 @@ def minimax(state):
 #                key=lambda x: x[1])[0]
 
 # ------------------------
-#
-# def min_play(state):
-#     if not state.find_available():
-#         return -evaluate(state)
-#     states = state.get_next_states()
-#     best_score = float('inf')
-#     for state in states:
-#         score = max_play(state)
-#         if score < best_score:
-#             # best_states = state
-#             best_score = score
-#     return best_score
-#
-#
-# def max_play(state):
-#     if not state.find_available():
-#         return evaluate(state)
-#     states = state.get_next_states()
-#     best_score = float('-inf')
-#     for state in states:
-#         score = min_play(state)
-#         if score > best_score:
-#             # best_state = state
-#             best_score = score
-#     return best_score
-#
-#
-# def minimax(state):
-#     states = state.get_next_states()
-#     best_state = states[0]
-#     best_score = float('-inf')
-#     for state in states:
-#         score = min_play(state)
-#         if score > best_score:
-#             best_state = state
-#             best_score = score
-#     return best_state
+
+def min_play(state):
+    if not state.find_available():
+        return -evaluate(state)
+    states = state.get_next_states()
+    best_score = INF
+    for state in states:
+        score = max_play(state)
+        if score < best_score:
+            # best_states = state
+            best_score = score
+    return best_score
+
+
+def max_play(state):
+    if not state.find_available():
+        return evaluate(state)
+    states = state.get_next_states()
+    best_score = INF
+    for state in states:
+        score = min_play(state)
+        if score > best_score:
+            # best_state = state
+            best_score = score
+    return best_score
+
+
+def minimax(state):
+    states = state.get_next_states()
+    best_state = states[0]
+    best_score = -INF
+    for state in states:
+        score = min_play(state)
+        if score > best_score:
+            best_state = state
+            best_score = score
+    return best_state
 
 # -------------------------
 
@@ -214,8 +219,7 @@ def play_round(state, start_human):
     (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
 
     while True:
-        state = take_turn_human(state) if state.player is player_human else take_turn_ai(
-            state)
+        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state)
         state.print_board()
 
         if not state.find_available():
