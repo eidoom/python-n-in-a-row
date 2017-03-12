@@ -111,7 +111,6 @@ def take_turn_human(state):
 
 def evaluate(state):
     winner = state.check_winner()
-    # return float('inf') if winner == state.player else float('-inf')
     if winner is state.player:
         return WIN_SCORE
     elif winner is state.get_other_player(state.player):
@@ -120,46 +119,78 @@ def evaluate(state):
         return TIE_SCORE
 
 
+# -----------------
+
+# def negamax_play(state):
+#     if not state.find_available():
+#         return -evaluate(state)
+#     return min([-negamax_play(board_state) for board_state in state.get_next_states()])
+#
+#
+# def minimax(state):
+#     return max([(board_state, negamax_play(board_state))
+#                 for board_state in state.get_next_states()],
+#                key=lambda x: x[1])[0]
+
+# ---------------------
+
+# def min_play(state):
+#     if not state.find_available():
+#         return -evaluate(state)
+#     return min([max_play(board_state) for board_state in state.get_next_states()])
+#
+#
+# def max_play(state):
+#     if not state.find_available():
+#         return evaluate(state)
+#     return max([min_play(board_state) for board_state in state.get_next_states()])
+#
+#
+# def minimax(state):
+#     return max([(board_state, min_play(board_state))
+#                 for board_state in state.get_next_states()],
+#                key=lambda x: x[1])[0]
+
+# ------------------------
+
 def min_play(state):
     if not state.find_available():
         return -evaluate(state)
-    # states = state.get_next_states()
-    # best_score = float('inf')
-    # for state in states:
-    #     score = max_play(state)
-    #     if score < best_score:
-    #         # best_states = state
-    #         best_score = score
-    # return best_score
-    return min([max_play(board_state) for board_state in state.get_next_states()])
+    states = state.get_next_states()
+    best_score = float('inf')
+    for state in states:
+        score = max_play(state)
+        if score < best_score:
+            # best_states = state
+            best_score = score
+    return best_score
 
 
 def max_play(state):
     if not state.find_available():
         return evaluate(state)
-    # states = state.get_next_states()
-    # best_score = float('-inf')
-    # for state in states:
-    #     score = min_play(state)
-    #     if score > best_score:
-    #         # best_state = state
-    #         best_score = score
-    # return best_score
-    return max([min_play(board_state) for board_state in state.get_next_states()])
+    states = state.get_next_states()
+    best_score = float('-inf')
+    for state in states:
+        score = min_play(state)
+        if score > best_score:
+            # best_state = state
+            best_score = score
+    return best_score
 
 
 def minimax(state):
-    # states = state.get_next_states()
-    # best_state = states[0]
-    # best_score = float('-inf')
-    # for state in states:
-    #     score = min_play(state)
-    #     if score > best_score:
-    #         best_state = state
-    #         best_score = score
-    # return best_state
-    return max([(board_state, min_play(board_state)) for board_state in state.get_next_states()],
-               key=lambda x: x[1])[0]
+    states = state.get_next_states()
+    best_state = states[0]
+    best_score = float('-inf')
+    for state in states:
+        score = min_play(state)
+        if score > best_score:
+            best_state = state
+            best_score = score
+    return best_state
+
+# -------------------------
 
 
 def take_turn_ai(state):
