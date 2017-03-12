@@ -82,6 +82,16 @@ class GameState:
     def find_available(self):
         if self.check_winner() in [NOUGHT, CROSS]:
             return []
+        elif BOARD_SIDE_LENGTH == 4:
+            last_top_square = BOARD_SIZE - BOARD_SIDE_LENGTH
+            top_squares = self.state[:last_top_square]
+            bottom_row = self.state[last_top_square:]
+            available_bottom_squares = [last_top_square + i for i, x in enumerate(bottom_row)
+                                        if x is BLANK]
+            available_top_squares = [i for i, x in enumerate(top_squares)
+                                     if (x is BLANK)
+                                     and (self.state[i + BOARD_SIDE_LENGTH] in (CROSS, NOUGHT))]
+            return available_bottom_squares + available_top_squares
         else:
             return [i for i, x in enumerate(self.state) if x is BLANK]
 
