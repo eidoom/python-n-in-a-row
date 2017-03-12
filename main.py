@@ -132,6 +132,18 @@ def evaluate(state):
 #                 for board_state in state.get_next_states()],
 #                key=lambda x: x[1])[0]
 
+# -----------------
+
+# def negamax_play(state):
+#     if not state.find_available():
+#         return -evaluate(state)
+#     return min(map(lambda board_state: -negamax_play(board_state), state.get_next_states()))
+#
+#
+# def minimax(state):
+#     return max(map(lambda board_state: (board_state, negamax_play(board_state)),
+#                    state.get_next_states()), key=lambda x: x[1])[0]
+
 # ---------------------
 
 # def min_play(state):
