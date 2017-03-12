@@ -4,9 +4,8 @@
 from argparse import ArgumentParser
 from copy import deepcopy
 from enum import Enum
+from sys import exit
 from time import clock
-
-# from random import choice
 
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
@@ -23,16 +22,31 @@ NOUGHT = "O"
 BOARD_SQUARE = "[{}]"
 
 parser = ArgumentParser()
-parser.add_argument(
-    "-l", "--side-length", type=int, default=3, help="Set the board side length.")
+
+parser.add_argument("-l", "--side-length", type=int, default=3, help="Set the board side length.")
+parser.add_argument("-n", "--row-length", type=int, default=3,
+                    help="Set the game victory row length.")
+parser.add_argument("-d", "--max-depth", type=int, default=None,
+                    help="Set the AI maximum search depth.")
+parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
+
 args = parser.parse_args()
+
 BOARD_SIDE_LENGTH = args.side_length
+MAX_DEPTH = int(15 - 2 * BOARD_SIDE_LENGTH) if args.max_depth is None else args.max_depth
+GRAVITY = args.gravity
+ROW_LENGTH = args.row_length
+
+if BOARD_SIDE_LENGTH >= 2 * ROW_LENGTH:
+    print("Must have board side length less than two times row length!")
+    exit()
 
 BOARD_SIZE = BOARD_SIDE_LENGTH ** 2
 
 POSITIONS = [[BOARD_SIDE_LENGTH * i + j for j in range(BOARD_SIDE_LENGTH)]
              for i in range(BOARD_SIDE_LENGTH)]
 
+# todo Missing many!
 HORIZONTAL_LINES = [POSITIONS[i] for i in range(BOARD_SIDE_LENGTH)]
 VERTICAL_LINES = [[POSITIONS[i][j] for i in range(BOARD_SIDE_LENGTH)]
                   for j in range(BOARD_SIDE_LENGTH)]
@@ -60,10 +74,12 @@ class GameState:
         if previous_state is None:
             self.state = [BLANK] * BOARD_SIZE
             self.player = CROSS
+            self.depth_left = MAX_DEPTH
         else:
             self.state = deepcopy(previous_state.state)
             self.state[move] = previous_state.player
             self.player = self.get_other_player(previous_state.player)
+            self.depth_left = previous_state.depth_left - 1
 
     @staticmethod
     def get_other_player(player):
@@ -73,23 +89,25 @@ class GameState:
         print(((BOARD_SQUARE * BOARD_SIDE_LENGTH + "\n") * BOARD_SIDE_LENGTH)
               .format(*[self.state[i] for i in range(BOARD_SIZE)]))
 
+    # Doesn't check if they are side by side!
     def check_winner(self):
         for line in LINES:
-            a = line[0]
-            if (len(set([self.state[i] for i in line])) == 1) and (self.state[a] is not BLANK):
-                return self.state[a]
+            line_squares = [self.state[i] for i in line]
+            common = max(line_squares, key=self.state.count)
+            if (line_squares.count(common) == ROW_LENGTH) \
+                    and (common is not BLANK):
+                return common
 
     def find_available(self):
         if self.check_winner() in [NOUGHT, CROSS]:
             return []
-        elif BOARD_SIDE_LENGTH > 3:
+        elif GRAVITY:
             last_top_square = BOARD_SIZE - BOARD_SIDE_LENGTH
             top_squares = self.state[:last_top_square]
             bottom_row = self.state[last_top_square:]
             available_bottom_squares = [last_top_square + i for i, x in enumerate(bottom_row)
                                         if x is BLANK]
-            available_top_squares = [i for i, x in enumerate(top_squares)
-                                     if (x is BLANK)
+            available_top_squares = [i for i, x in enumerate(top_squares) if (x is BLANK)
                                      and (self.state[i + BOARD_SIDE_LENGTH] in (CROSS, NOUGHT))]
             return available_bottom_squares + available_top_squares
         else:
@@ -200,7 +218,7 @@ def evaluate(state):
 # ------------------------ negamax, alpha-beta, fail-soft
 
 def negamax_play(alpha, beta, state):
-    if state.check_game_over():
+    if state.check_game_over() or (state.depth_left == 0):
         return evaluate(state), state
     states = state.get_next_states()
     best_state = states[0]
@@ -222,6 +240,7 @@ def minimax(state):
     beta = INF
     state = negamax_play(alpha, beta, state)[1]
     return state
+
 
 # ------------------------ minimax, standard
 
