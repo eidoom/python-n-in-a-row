@@ -4,6 +4,7 @@
 from argparse import ArgumentParser
 from copy import deepcopy
 from enum import Enum
+
 # from random import choice
 
 YES = ("", "y", "Y", "Yes", "yes")
@@ -121,9 +122,7 @@ def evaluate(state):
 
 def min_play(state):
     if not state.find_available():
-        final = evaluate(state)
-        # print("min:{}".format(final))
-        return final
+        return -evaluate(state)
     # states = state.get_next_states()
     # best_score = float('inf')
     # for state in states:
@@ -132,16 +131,12 @@ def min_play(state):
     #         # best_states = state
     #         best_score = score
     # return best_score
-    minn = min(map(lambda board_state: max_play(board_state), state.get_next_states()))
-    # print("min:{}".format(minn))
-    return minn
+    return min([max_play(board_state) for board_state in state.get_next_states()])
 
 
 def max_play(state):
     if not state.find_available():
-        final = evaluate(state)
-        # print("Max:{}".format(final))
-        return final
+        return evaluate(state)
     # states = state.get_next_states()
     # best_score = float('-inf')
     # for state in states:
@@ -150,9 +145,7 @@ def max_play(state):
     #         # best_state = state
     #         best_score = score
     # return best_score
-    maxx = max(map(lambda board_state: min_play(board_state), state.get_next_states()))
-    # print("Max:{}".format(maxx))
-    return maxx
+    return max([min_play(board_state) for board_state in state.get_next_states()])
 
 
 def minimax(state):
@@ -165,8 +158,8 @@ def minimax(state):
     #         best_state = state
     #         best_score = score
     # return best_state
-    return max(map(lambda board_state: (board_state, min_play(board_state)),
-                   state.get_next_states()), key=lambda x: x[1])[0]
+    return max([(board_state, min_play(board_state)) for board_state in state.get_next_states()],
+               key=lambda x: x[1])[0]
 
 
 def take_turn_ai(state):
