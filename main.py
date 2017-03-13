@@ -10,11 +10,11 @@ from time import clock
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
 
-WIN_SCORE = 1
+INF = float('inf')
+
+WIN_SCORE = INF
 TIE_SCORE = 0
 LOSE_SCORE = - WIN_SCORE
-
-INF = float('inf')
 
 BLANK = " "
 CROSS = "X"
@@ -37,14 +37,18 @@ args = parser.parse_args()
 
 BOARD_WIDTH = args.board_width
 BOARD_HEIGHT = args.board_height
-MAX_DEPTH = args.max_depth
-GRAVITY = args.gravity
 ROW_LENGTH = args.row_length
 
 if ROW_LENGTH > max(BOARD_WIDTH, BOARD_HEIGHT):
     exit("Impossible to win: victory row length too long for board size!")
 
+MAX_DEPTH = args.max_depth
+GRAVITY = args.gravity
+
 BOARD_SIZE = BOARD_WIDTH * BOARD_HEIGHT
+
+HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
+DIRECTIONS = HALF_DIRECTIONS + [(-x, -y) for (x, y) in HALF_DIRECTIONS]
 
 
 class Outcome(Enum):
@@ -84,12 +88,10 @@ class GameState:
         return tally
 
     def check_winner(self):
-        half_directions = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
-        directions = half_directions + [(-x, -y) for (x, y) in half_directions]
         for i, row in enumerate(self.state_two):
             for j, occupier in enumerate(row):
                 if not (occupier is BLANK):
-                    for direction in directions:
+                    for direction in DIRECTIONS:
                         if self.count_line_length((i, j), direction, occupier, 1) == ROW_LENGTH:
                             return occupier
 
@@ -114,6 +116,21 @@ class GameState:
     def get_next_states(self):
         return [GameState(self, move) for move in self.find_available()]
 
+    def evaluate_end(self):
+        return {self.player: WIN_SCORE, self.get_other_player(self.player): LOSE_SCORE,
+                None: TIE_SCORE}[self.check_winner()]
+
+    def evaluate_cutoff(self):
+        score = 0
+        for i, row in enumerate(self.state_two):
+            for j, occupier in enumerate(row):
+                for direction in DIRECTIONS:
+                    if occupier is self.player:
+                        score += self.count_line_length((i, j), direction, occupier, 0)
+                    elif occupier is self.get_other_player(self.player):
+                        score -= self.count_line_length((i, j), direction, occupier, 0)
+        return score
+
 
 def prompt_boolean(prompt):
     while True:
@@ -136,11 +153,6 @@ def take_turn_human(state):
                 return GameState(state, move)
         except ValueError:
             print("Really?")
-
-
-def evaluate(state):
-    return {state.player: WIN_SCORE, state.get_other_player(state.player): LOSE_SCORE,
-            None: TIE_SCORE}[state.check_winner()]
 
 
 # ----------------- negamax, list comprehension
@@ -213,8 +225,10 @@ def evaluate(state):
 # ------------------------ negamax, alpha-beta, fail-soft
 
 def negamax_play(alpha, beta, depth_left, state):
-    if state.check_game_over() or (depth_left == 0):
-        return evaluate(state), state
+    if state.check_game_over():
+        return state.evaluate_end(), state
+    if depth_left == 0:
+        return state.evaluate_cutoff(), state
     states = state.get_next_states()
     depth_left -= 1
     best_state = states[0]
@@ -368,8 +382,7 @@ def play_game():
         if not prompt_boolean("\nPlay again? "):
             break
 
-    print("\nHuman: {}\nAI:    {}\nTie:   {}"
-          .format(*[tallies[outcome] for outcome in Outcome]))
+    print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*[tallies[outcome] for outcome in Outcome]))
 
 
 def main():
