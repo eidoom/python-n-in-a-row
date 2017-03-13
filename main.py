@@ -23,41 +23,28 @@ BOARD_SQUARE = "[{}]"
 
 parser = ArgumentParser()
 
-parser.add_argument("-l", "--side-length", type=int, default=3, help="Set the board side length.")
+parser.add_argument("-v", "--board-height", type=int, default=3,
+                    help="Set the board height (vertical side length.)")
+parser.add_argument("-w", "--board-width", type=int, default=3,
+                    help="Set the board width (horizontal side length).")
 parser.add_argument("-n", "--row-length", type=int, default=3,
                     help="Set the game victory row length.")
-parser.add_argument("-d", "--max-depth", type=int, default=None,
-                    help="Set the AI maximum search depth.")
+parser.add_argument("-d", "--max-depth", type=int, default=10,
+                    help="Set the AI maximum search depth (higher means more difficult opponent).")
 parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
 
 args = parser.parse_args()
 
-BOARD_SIDE_LENGTH = args.side_length
-MAX_DEPTH = int(15 - 2 * BOARD_SIDE_LENGTH) if args.max_depth is None else args.max_depth
+BOARD_WIDTH = args.board_width
+BOARD_HEIGHT = args.board_height
+MAX_DEPTH = args.max_depth
 GRAVITY = args.gravity
 ROW_LENGTH = args.row_length
 
-if BOARD_SIDE_LENGTH >= 2 * ROW_LENGTH:
-    print("Must have board side length less than two times row length!")
-    exit()
+if ROW_LENGTH > max(BOARD_WIDTH, BOARD_HEIGHT):
+    exit("Impossible to win: victory row length too long for board size!")
 
-BOARD_SIZE = BOARD_SIDE_LENGTH ** 2
-
-POSITIONS = [[BOARD_SIDE_LENGTH * i + j for j in range(BOARD_SIDE_LENGTH)]
-             for i in range(BOARD_SIDE_LENGTH)]
-
-# todo Missing many!
-HORIZONTAL_LINES = [POSITIONS[i] for i in range(BOARD_SIDE_LENGTH)]
-VERTICAL_LINES = [[POSITIONS[i][j] for i in range(BOARD_SIDE_LENGTH)]
-                  for j in range(BOARD_SIDE_LENGTH)]
-DIAGONAL_LINE = [[POSITIONS[i][i] for i in range(BOARD_SIDE_LENGTH)]]
-ANTI_DIAGONAL_LINE = [[POSITIONS[i][BOARD_SIDE_LENGTH - 1 - i]
-                       for i in range(BOARD_SIDE_LENGTH)]]
-
-LINES = (HORIZONTAL_LINES + VERTICAL_LINES + DIAGONAL_LINE
-         + ANTI_DIAGONAL_LINE)
-
-ALL_LINES = LINES + [line[::-1] for line in LINES]
+BOARD_SIZE = BOARD_WIDTH * BOARD_HEIGHT
 
 
 class Outcome(Enum):
@@ -74,41 +61,49 @@ class GameState:
         if previous_state is None:
             self.state = [BLANK] * BOARD_SIZE
             self.player = CROSS
-            self.depth_left = MAX_DEPTH
         else:
             self.state = deepcopy(previous_state.state)
             self.state[move] = previous_state.player
             self.player = self.get_other_player(previous_state.player)
-            self.depth_left = previous_state.depth_left - 1
+        self.state_two = [[self.state[BOARD_WIDTH * i + j] for j in range(BOARD_WIDTH)]
+                          for i in range(BOARD_HEIGHT)]
 
     @staticmethod
     def get_other_player(player):
         return {CROSS: NOUGHT, NOUGHT: CROSS}[player]
 
     def print_board(self):
-        print(((BOARD_SQUARE * BOARD_SIDE_LENGTH + "\n") * BOARD_SIDE_LENGTH)
+        print(((BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
               .format(*[self.state[i] for i in range(BOARD_SIZE)]))
 
-    # Doesn't check if they are side by side!
+    def count_line_length(self, position, direction, occupier, tally):
+        i, j = [sum(x) for x in zip(position, direction)]
+        if (0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH):
+            if self.state_two[i][j] is occupier:
+                return self.count_line_length((i, j), direction, occupier, tally + 1)
+        return tally
+
     def check_winner(self):
-        for line in LINES:
-            line_squares = [self.state[i] for i in line]
-            common = max(line_squares, key=self.state.count)
-            if (line_squares.count(common) == ROW_LENGTH) \
-                    and (common is not BLANK):
-                return common
+        half_directions = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
+        directions = half_directions + [(-x, -y) for (x, y) in half_directions]
+        for i, row in enumerate(self.state_two):
+            for j, occupier in enumerate(row):
+                if not (occupier is BLANK):
+                    for direction in directions:
+                        if self.count_line_length((i, j), direction, occupier, 1) == ROW_LENGTH:
+                            return occupier
 
     def find_available(self):
         if self.check_winner() in [NOUGHT, CROSS]:
             return []
         elif GRAVITY:
-            last_top_square = BOARD_SIZE - BOARD_SIDE_LENGTH
+            last_top_square = BOARD_SIZE - BOARD_WIDTH
             top_squares = self.state[:last_top_square]
             bottom_row = self.state[last_top_square:]
             available_bottom_squares = [last_top_square + i for i, x in enumerate(bottom_row)
                                         if x is BLANK]
             available_top_squares = [i for i, x in enumerate(top_squares) if (x is BLANK)
-                                     and (self.state[i + BOARD_SIDE_LENGTH] in (CROSS, NOUGHT))]
+                                     and (self.state[i + BOARD_WIDTH] in (CROSS, NOUGHT))]
             return available_bottom_squares + available_top_squares
         else:
             return [i for i, x in enumerate(self.state) if x is BLANK]
@@ -217,14 +212,15 @@ def evaluate(state):
 
 # ------------------------ negamax, alpha-beta, fail-soft
 
-def negamax_play(alpha, beta, state):
-    if state.check_game_over() or (state.depth_left == 0):
+def negamax_play(alpha, beta, depth_left, state):
+    if state.check_game_over() or (depth_left == 0):
         return evaluate(state), state
     states = state.get_next_states()
+    depth_left -= 1
     best_state = states[0]
     best_score = -INF
     for state in states:
-        score = -negamax_play(-beta, -alpha, state)[0]
+        score = -negamax_play(-beta, -alpha, depth_left, state)[0]
         if score >= beta:
             return score, state
         elif score > best_score:
@@ -238,7 +234,8 @@ def negamax_play(alpha, beta, state):
 def minimax(state):
     alpha = -INF
     beta = INF
-    state = negamax_play(alpha, beta, state)[1]
+    depth_left = MAX_DEPTH
+    state = negamax_play(alpha, beta, depth_left, state)[1]
     return state
 
 
