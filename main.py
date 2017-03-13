@@ -4,6 +4,7 @@
 from argparse import ArgumentParser
 from copy import deepcopy
 from enum import Enum
+from random import choice
 from sys import exit
 from time import clock
 
@@ -19,19 +20,26 @@ LOSE_SCORE = - WIN_SCORE
 BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
-BOARD_SQUARE = "[{}]"
+
+MINIMAX = "minimax"
+RANDOM = "random"
 
 parser = ArgumentParser()
 
-parser.add_argument("-v", "--board-height", type=int, default=3,
+parser.add_argument("-a", "--ai", type=str, default="{}".format(MINIMAX),
+                    help="Set the computer AI: {} or {}".format(RANDOM, MINIMAX))
+parser.add_argument("-y", "--board-height", type=int, default=3,
                     help="Set the board height (vertical side length.)")
-parser.add_argument("-w", "--board-width", type=int, default=3,
+parser.add_argument("-x", "--board-width", type=int, default=3,
                     help="Set the board width (horizontal side length).")
+parser.add_argument("-s", "--square-board-side-length", type=int, default=None,
+                    help="Set up a square board of desired side length (overrules other size settings).")
 parser.add_argument("-n", "--row-length", type=int, default=3,
                     help="Set the game victory row length.")
 parser.add_argument("-d", "--max-depth", type=int, default=10,
                     help="Set the AI maximum search depth (higher means more difficult opponent).")
 parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
+parser.add_argument("-q", "--quiet", action="store_true", help="Turn off excess verbosity.")
 
 args = parser.parse_args()
 
@@ -39,13 +47,25 @@ BOARD_WIDTH = args.board_width
 BOARD_HEIGHT = args.board_height
 ROW_LENGTH = args.row_length
 
+SQUARE_SIZE = args.square_board_side_length
+
+if not (SQUARE_SIZE is None):
+    BOARD_WIDTH = SQUARE_SIZE
+    BOARD_HEIGHT = SQUARE_SIZE
+
 if ROW_LENGTH > max(BOARD_WIDTH, BOARD_HEIGHT):
     exit("Impossible to win: victory row length too long for board size!")
 
+BOARD_SIZE = BOARD_WIDTH * BOARD_HEIGHT
+
 MAX_DEPTH = args.max_depth
 GRAVITY = args.gravity
+AI = args.ai
+VERBOSE = not args.quiet
 
-BOARD_SIZE = BOARD_WIDTH * BOARD_HEIGHT
+FIRST_TURN_RANDOM = True
+
+BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
 
 HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
 DIRECTIONS = HALF_DIRECTIONS + [(-x, -y) for (x, y) in HALF_DIRECTIONS]
@@ -77,7 +97,8 @@ class GameState:
         return {CROSS: NOUGHT, NOUGHT: CROSS}[player]
 
     def print_board(self):
-        print(((BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
+        columns = (("  {}  " * BOARD_WIDTH).format(*[(i + 1) for i in range(BOARD_WIDTH)])) + "\n" if GRAVITY else ""
+        print((columns + (BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
               .format(*[self.state[i] for i in range(BOARD_SIZE)]))
 
     def count_line_length(self, position, direction, occupier, tally):
@@ -132,27 +153,35 @@ class GameState:
         return score
 
 
-def prompt_boolean(prompt):
-    while True:
-        input_char = input(prompt)
+# ------------------------ negamax, alpha-beta, fail-soft
 
-        if input_char in NO:
-            return False
-        elif input_char in YES:
-            return True
-        else:
-            print("What?")
+def negamax_play(alpha, beta, depth_left, state):
+    if state.check_game_over():
+        return state.evaluate_end(), state
+    if depth_left == 0:
+        return state.evaluate_cutoff(), state
+    states = state.get_next_states()
+    depth_left -= 1
+    best_state = states[0]
+    best_score = -INF
+    for state in states:
+        score = -negamax_play(-beta, -alpha, depth_left, state)[0]
+        if score >= beta:
+            return score, state
+        elif score > best_score:
+            best_score = score
+            if score > alpha:
+                alpha = score
+                best_state = state
+    return best_score, best_state
 
 
-def take_turn_human(state):
-    while True:
-        try:
-            move = int(input("Your go: ")) - 1
-
-            if move in state.find_available():
-                return GameState(state, move)
-        except ValueError:
-            print("Really?")
+def minimax(state):
+    alpha = -INF
+    beta = INF
+    depth_left = MAX_DEPTH
+    state = negamax_play(alpha, beta, depth_left, state)[1]
+    return state
 
 
 # ----------------- negamax, list comprehension
@@ -222,35 +251,6 @@ def take_turn_human(state):
 #     state = negamax_play(alpha, beta, state)[1]
 #     return state
 
-# ------------------------ negamax, alpha-beta, fail-soft
-
-def negamax_play(alpha, beta, depth_left, state):
-    if state.check_game_over():
-        return state.evaluate_end(), state
-    if depth_left == 0:
-        return state.evaluate_cutoff(), state
-    states = state.get_next_states()
-    depth_left -= 1
-    best_state = states[0]
-    best_score = -INF
-    for state in states:
-        score = -negamax_play(-beta, -alpha, depth_left, state)[0]
-        if score >= beta:
-            return score, state
-        elif score > best_score:
-            best_score = score
-            if score > alpha:
-                alpha = score
-                best_state = state
-    return best_score, best_state
-
-
-def minimax(state):
-    alpha = -INF
-    beta = INF
-    depth_left = MAX_DEPTH
-    state = negamax_play(alpha, beta, depth_left, state)[1]
-    return state
 
 
 # ------------------------ minimax, standard
@@ -336,25 +336,64 @@ def minimax(state):
 # -------------------------
 
 
-def take_turn_ai(state):
+def take_turn_ai(state, decision):
     print("AI's go:")
     start_time = clock()
-    result = minimax(state)
-    print("Time: {}".format(clock() - start_time))
+    if decision is MINIMAX:
+        result = minimax(state)
+    elif decision is RANDOM:
+        result = choice(state.get_next_states())
+    else:
+        exit("Sorry, AI {} is unsupported.".format(AI))
+    if VERBOSE:
+        print("Time: {}".format(clock() - start_time))
     return result
 
 
-# def take_turn_ai(state):
-#     from random import choice
-#     print("AI's go:")
-#     return choice(state.get_next_states())
+def take_turn_human(state):
+    while True:
+        try:
+            move = int(input("Your go: ")) - 1
+
+            if GRAVITY:
+                available = state.find_available()
+                coords = [(number // BOARD_WIDTH, number % BOARD_WIDTH) for number in available]
+                for i, j in coords:
+                    if j == move:
+                        position = i * BOARD_WIDTH + j
+                        return GameState(state, position)
+
+            else:
+                if move in state.find_available():
+                    return GameState(state, move)
+
+        except ValueError:
+            print("Really?")
+
+
+def prompt_boolean(prompt):
+    while True:
+        input_char = input(prompt)
+
+        if input_char in NO:
+            return False
+        elif input_char in YES:
+            return True
+        else:
+            print("What?")
 
 
 def play_round(state, start_human):
     (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
 
+    if FIRST_TURN_RANDOM and (not start_human):
+        state = take_turn_ai(state, RANDOM)
+        state.print_board()
+
     while True:
-        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state)
+
+        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
+
         state.print_board()
 
         if state.check_game_over():
