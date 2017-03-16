@@ -97,31 +97,52 @@ class GameState:
         return {CROSS: NOUGHT, NOUGHT: CROSS}[player]
 
     def print_board(self):
-        columns = (("  {}  " * BOARD_WIDTH).format(
+        column_numbers = (("  {}  " * BOARD_WIDTH).format(
             *[(i + 1) for i in range(BOARD_WIDTH)])) + "\n" if GRAVITY else ""
-        print((columns + (BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
+        print((column_numbers + (BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
               .format(*[self.state[i] for i in range(BOARD_SIZE)]))
 
-    def check_position(self, i, j, occupier):
+    @staticmethod
+    def check_on_board(position):
+        i, j = position
         if (0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH):
+            return True
+        else:
+            return False
+
+    def check_position(self, position, occupier):
+        if self.check_on_board(position):
+            i, j = position
             if self.state_two[i][j] is occupier:
                 return True
         return False
 
     def count_line_length(self, position, direction, occupier, tally):
-        i, j = [sum(x) for x in zip(position, direction)]
-        if self.check_position(i, j, occupier):
-            return self.count_line_length((i, j), direction, occupier, tally + 1)
+        new_position = [sum(x) for x in zip(position, direction)]
+        if self.check_position(new_position, occupier):
+            return self.count_line_length(new_position, direction, occupier, tally + 1)
         else:
-            return tally, (i, j)
+            return tally, new_position
 
-    def check_win_possible(self, position, direction, occupier):
-        line_length, (i, j) = self.count_line_length(position, direction, occupier, 1)
+    def count_possible_line_length(self, current_length, position, direction, occupier):
+        for piece in (BLANK, occupier):
+            if self.check_position(position, piece):
+                sub_length, new_position = self.count_line_length(position, direction, piece, 1)
+                return self.count_possible_line_length(current_length + sub_length, new_position,
+                                                       direction, occupier)
+        return current_length
 
-        blank_length = self.count_line_length((i, j), direction, BLANK, 1)[0] \
-            if self.check_position(i, j, BLANK) else 0
+    def evaluate_score(self, position, direction, occupier):
+        simple = False
+        if simple:
+            return self.count_line_length(position, direction, occupier, 0)[0]
 
-        return line_length if ((line_length + blank_length) >= ROW_LENGTH) else 0
+        existing_line_length, position = self.count_line_length(position, direction, occupier, 1)
+
+        possible_line_length = self.count_possible_line_length(0, position, direction, occupier)
+
+        return (existing_line_length ** 10) \
+            if ((existing_line_length + possible_line_length) >= ROW_LENGTH) else 0
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
@@ -162,9 +183,9 @@ class GameState:
             for j, occupier in enumerate(row):
                 for direction in DIRECTIONS:
                     if occupier is self.player:
-                        score += self.check_win_possible((i, j), direction, occupier)
+                        score += self.evaluate_score((i, j), direction, occupier)
                     elif occupier is self.get_other_player(self.player):
-                        score -= self.check_win_possible((i, j), direction, occupier)
+                        score -= self.evaluate_score((i, j), direction, occupier)
         return score
 
     # def evaluate_cutoff(self):
