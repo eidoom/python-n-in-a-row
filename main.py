@@ -121,7 +121,7 @@ class GameState:
         blank_length = self.count_line_length((i, j), direction, BLANK, 1)[0] \
             if self.check_position(i, j, BLANK) else 0
 
-        return 1 if ((line_length + blank_length) >= ROW_LENGTH) else 0
+        return line_length if ((line_length + blank_length) >= ROW_LENGTH) else 0
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
