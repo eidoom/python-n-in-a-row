@@ -21,8 +21,12 @@ BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
 
+FIRST_PLAYER = CROSS
+
 MINIMAX = "minimax"
 RANDOM = "random"
+
+SIMPLE_EVALUATOR = False
 
 parser = ArgumentParser()
 
@@ -84,7 +88,7 @@ class GameState:
     def __init__(self, previous_state=None, move=None):
         if previous_state is None:
             self.state = [BLANK] * BOARD_SIZE
-            self.player = CROSS
+            self.player = FIRST_PLAYER
         else:
             self.state = deepcopy(previous_state.state)
             self.state[move] = previous_state.player
@@ -137,8 +141,7 @@ class GameState:
         return False, additional_lengths
 
     def evaluate_score(self, position, direction, occupier):
-        simple = False
-        if simple:
+        if SIMPLE_EVALUATOR:
             return self.count_line_length(position, direction, occupier, 0)[0]
 
         existing_line_length, position = self.count_line_length(position, direction, occupier, 1)
@@ -201,17 +204,6 @@ class GameState:
                     if occupier is BLANK:
                         score += self.evaluate_score_blank((i, j), direction)
         return score
-
-        # def evaluate_cutoff(self):
-        #     score = 0
-        #     for i, row in enumerate(self.state_two):
-        #         for j, occupier in enumerate(row):
-        #             for direction in DIRECTIONS:
-        #                 if occupier is self.player:
-        #                     score += self.count_line_length((i, j), direction, occupier, 0)[0]
-        #                 elif occupier is self.get_other_player(self.player):
-        #                     score -= self.count_line_length((i, j), direction, occupier, 0)[0]
-        #     return score
 
 
 # ------------------------ negamax, alpha-beta, fail-soft
