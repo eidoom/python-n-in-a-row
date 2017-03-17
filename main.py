@@ -37,7 +37,8 @@ parser.add_argument("-y", "--board-height", type=int, default=3,
 parser.add_argument("-x", "--board-width", type=int, default=3,
                     help="Set the board width (horizontal side length).")
 parser.add_argument("-s", "--square-board-side-length", type=int, default=None,
-                    help="Set up a square board of desired side length (overrules other size settings).")
+                    help="Set up a square board of desired side length "
+                         "(overrules other size settings).")
 parser.add_argument("-n", "--row-length", type=int, default=3,
                     help="Set the game victory row length.")
 parser.add_argument("-d", "--max-depth", type=int, default=10,
@@ -208,7 +209,6 @@ class GameState:
 
 # ------------------------ negamax, alpha-beta, fail-soft
 
-
 def negamax_play(alpha, beta, depth_left, state):
     if state.check_game_over():
         return state.evaluate_end(), state
@@ -236,6 +236,104 @@ def minimax(state):
     depth_left = MAX_DEPTH
     state = negamax_play(alpha, beta, depth_left, state)[1]
     return state
+
+
+# ------------------------
+
+def take_turn_ai(state, decision):
+    print("AI's go:")
+    start_time = clock()
+    if decision is MINIMAX:
+        result = minimax(state)
+    elif decision is RANDOM:
+        result = choice(state.get_next_states())
+    else:
+        exit("Sorry, AI {} is unsupported.".format(AI))
+    if VERBOSE:
+        print("Time: {}".format(clock() - start_time))
+    return result
+
+
+def take_turn_human(state):
+    while True:
+        try:
+            move = int(input("Your go: ")) - 1
+
+            if GRAVITY:
+                available = state.find_available()
+                coords = [(number // BOARD_WIDTH, number % BOARD_WIDTH) for number in available]
+                for i, j in coords:
+                    if j == move:
+                        position = i * BOARD_WIDTH + j
+                        return GameState(state, position)
+
+            else:
+                if move in state.find_available():
+                    return GameState(state, move)
+
+        except ValueError:
+            print("Really?")
+
+
+def prompt_boolean(prompt):
+    while True:
+        input_char = input(prompt)
+
+        if input_char in NO:
+            return False
+        elif input_char in YES:
+            return True
+        else:
+            print("What?")
+
+
+def play_round(state, start_human):
+    (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
+
+    if FIRST_TURN_RANDOM and (not start_human):
+        state = take_turn_ai(state, RANDOM)
+        state.print_board()
+
+    while True:
+
+        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
+
+        state.print_board()
+
+        if state.check_game_over():
+            break
+
+    winner = state.check_winner()
+
+    return {player_human: Outcome.HUMAN, player_ai: Outcome.AI, None: Outcome.TIE}[winner]
+
+
+def play_game():
+    tallies = {outcome: 0 for outcome in Outcome}
+
+    while True:
+        state = GameState()
+        state.print_board()
+
+        start_human = prompt_boolean("Wanna start? ")
+
+        winner = play_round(state, start_human)
+
+        print(winner.congratulations())
+        tallies[winner] += 1
+
+        if not prompt_boolean("\nPlay again? "):
+            break
+
+    print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*[tallies[outcome] for outcome in Outcome]))
+
+
+def main():
+    play_game()
+
+
+if __name__ == "__main__":
+    main()
 
 
 # ----------------- negamax, list comprehension
@@ -386,99 +484,3 @@ def minimax(state):
 #
 #
 # -------------------------
-
-
-def take_turn_ai(state, decision):
-    print("AI's go:")
-    start_time = clock()
-    if decision is MINIMAX:
-        result = minimax(state)
-    elif decision is RANDOM:
-        result = choice(state.get_next_states())
-    else:
-        exit("Sorry, AI {} is unsupported.".format(AI))
-    if VERBOSE:
-        print("Time: {}".format(clock() - start_time))
-    return result
-
-
-def take_turn_human(state):
-    while True:
-        try:
-            move = int(input("Your go: ")) - 1
-
-            if GRAVITY:
-                available = state.find_available()
-                coords = [(number // BOARD_WIDTH, number % BOARD_WIDTH) for number in available]
-                for i, j in coords:
-                    if j == move:
-                        position = i * BOARD_WIDTH + j
-                        return GameState(state, position)
-
-            else:
-                if move in state.find_available():
-                    return GameState(state, move)
-
-        except ValueError:
-            print("Really?")
-
-
-def prompt_boolean(prompt):
-    while True:
-        input_char = input(prompt)
-
-        if input_char in NO:
-            return False
-        elif input_char in YES:
-            return True
-        else:
-            print("What?")
-
-
-def play_round(state, start_human):
-    (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
-
-    if FIRST_TURN_RANDOM and (not start_human):
-        state = take_turn_ai(state, RANDOM)
-        state.print_board()
-
-    while True:
-
-        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
-
-        state.print_board()
-
-        if state.check_game_over():
-            break
-
-    winner = state.check_winner()
-
-    return {player_human: Outcome.HUMAN, player_ai: Outcome.AI, None: Outcome.TIE}[winner]
-
-
-def play_game():
-    tallies = {outcome: 0 for outcome in Outcome}
-
-    while True:
-        state = GameState()
-        state.print_board()
-
-        start_human = prompt_boolean("Wanna start? ")
-
-        winner = play_round(state, start_human)
-
-        print(winner.congratulations())
-        tallies[winner] += 1
-
-        if not prompt_boolean("\nPlay again? "):
-            break
-
-    print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*[tallies[outcome] for outcome in Outcome]))
-
-
-def main():
-    play_game()
-
-
-if __name__ == "__main__":
-    main()
