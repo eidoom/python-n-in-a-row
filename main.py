@@ -124,13 +124,17 @@ class GameState:
         else:
             return tally, new_position
 
-    def count_possible_line_length(self, current_length, position, direction, occupier):
+    def count_possible_line_length(
+            self, total_length, additional_lengths, position, direction, occupier):
+        if total_length == ROW_LENGTH:
+            return True, additional_lengths
         for piece in (BLANK, occupier):
             if self.check_position(position, piece):
-                sub_length, new_position = self.count_line_length(position, direction, piece, 1)
-                return self.count_possible_line_length(current_length + sub_length, new_position,
-                                                       direction, occupier)
-        return current_length
+                extra, new_position = self.count_line_length(position, direction, piece, 1)
+                additional_lengths[occupier] += extra
+                return self.count_possible_line_length(
+                    total_length + extra, additional_lengths, new_position, direction, occupier)
+        return False, additional_lengths
 
     def evaluate_score(self, position, direction, occupier):
         simple = False
@@ -139,10 +143,18 @@ class GameState:
 
         existing_line_length, position = self.count_line_length(position, direction, occupier, 1)
 
-        possible_line_length = self.count_possible_line_length(0, position, direction, occupier)
+        success, additional_lengths = self.count_possible_line_length(
+            existing_line_length, {BLANK: 0, occupier: 0}, position, direction, occupier)
 
-        return (existing_line_length ** 10) \
-            if ((existing_line_length + possible_line_length) >= ROW_LENGTH) else 0
+        return (existing_line_length + additional_lengths[occupier]) if success else 0
+
+    def evaluate_score_blank(self, position, direction):
+        score = 0
+        for player, sign in zip((self.player, self.get_other_player(self.player)), (+1, -1)):
+            success, line_lengths = self.count_possible_line_length(
+                1, {BLANK: 0, player: 0}, position, direction, player)
+            score += sign * line_lengths[player] if success else 0
+        return score
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
@@ -182,26 +194,28 @@ class GameState:
         for i, row in enumerate(self.state_two):
             for j, occupier in enumerate(row):
                 for direction in DIRECTIONS:
-                    if occupier is self.player:
-                        score += self.evaluate_score((i, j), direction, occupier)
-                    elif occupier is self.get_other_player(self.player):
-                        score -= self.evaluate_score((i, j), direction, occupier)
+                    for player, sign in zip((self.player, self.get_other_player(self.player)),
+                                            (+1, -1)):
+                        if occupier is player:
+                            score += sign * self.evaluate_score((i, j), direction, occupier)
+                    if occupier is BLANK:
+                        score += self.evaluate_score_blank((i, j), direction)
         return score
 
-    # def evaluate_cutoff(self):
-    #     score = 0
-    #     for i, row in enumerate(self.state_two):
-    #         for j, occupier in enumerate(row):
-    #             for direction in DIRECTIONS:
-    #                 if occupier is self.player:
-    #                     score += self.count_line_length((i, j), direction, occupier, 0)[0]
-    #                 elif occupier is self.get_other_player(self.player):
-    #                     score -= self.count_line_length((i, j), direction, occupier, 0)[0]
-    #     return score
-
+        # def evaluate_cutoff(self):
+        #     score = 0
+        #     for i, row in enumerate(self.state_two):
+        #         for j, occupier in enumerate(row):
+        #             for direction in DIRECTIONS:
+        #                 if occupier is self.player:
+        #                     score += self.count_line_length((i, j), direction, occupier, 0)[0]
+        #                 elif occupier is self.get_other_player(self.player):
+        #                     score -= self.count_line_length((i, j), direction, occupier, 0)[0]
+        #     return score
 
 
 # ------------------------ negamax, alpha-beta, fail-soft
+
 
 def negamax_play(alpha, beta, depth_left, state):
     if state.check_game_over():
@@ -298,8 +312,6 @@ def minimax(state):
 #     beta = INF
 #     state = negamax_play(alpha, beta, state)[1]
 #     return state
-
-
 
 # ------------------------ minimax, standard
 
