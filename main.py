@@ -24,12 +24,12 @@ FIRST_TURN_RANDOM = True
 MINIMAX = "minimax"
 RANDOM = "random"
 
-SIMPLE_EVALUATOR = False
+SIMPLE_EVALUATOR = 1
 
-DEBUG = False
+DEBUG = 0
 
-HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
-DIRECTIONS = HALF_DIRECTIONS + [(-x, -y) for (x, y) in HALF_DIRECTIONS]
+HALF_DIRECTIONS = [[-1, 0], [-1, 1], [0, 1], [1, 1]]
+DIRECTIONS = HALF_DIRECTIONS + [[-x, -y] for [x, y] in HALF_DIRECTIONS]
 
 
 class Outcome(Enum):
@@ -134,40 +134,35 @@ class GameState:
     def get_next_states(self):
         return [GameState(self, move) for move in self.find_available()]
 
-    def evaluate_end(self, depth_left):
-        raw_score = {self.player: WIN_SCORE, self.get_other_player(self.player): LOSE_SCORE,
-                     None: TIE_SCORE}[self.check_winner()]
-        if DEBUG:
-            self.print_board()
-            print("End:    {}".format(raw_score + depth_left))
-        return raw_score + depth_left
-
-    def evaluate_cutoff(self):
-        score = 0
-        for i, row in enumerate(self.state_two):
-            for j, occupier in enumerate(row):
-                for direction in DIRECTIONS:
-                    # for player, sign in zip((self.player, self.get_other_player(self.player)),
-                    #                         (1, -1)):
-                    #     if occupier is player:
-                    #         score += sign * self.evaluate_score((i, j), direction, occupier)
-                    if occupier is self.player:
-                        score += self.evaluate_score((i, j), direction, occupier)
-                    if occupier is self.get_other_player(self.player):
-                        score -= self.evaluate_score((i, j), direction, occupier)
-        if DEBUG:
-            self.print_board()
-            print("Cutoff: {}".format(score))
-        return score
+    def evaluate(self):
+        winner = self.check_winner()
+        if winner is not None:
+            score = {self.player: WIN_SCORE, self.get_other_player(self.player): LOSE_SCORE,
+                     None: TIE_SCORE}[winner]
+            if DEBUG:
+                self.print_board()
+                print("End:    {}".format(score))
+            return score
+        else:
+            score = 0
+            for i, row in enumerate(self.state_two):
+                for j, occupier in enumerate(row):
+                    for direction in DIRECTIONS:
+                        if occupier is self.player:
+                            score += self.evaluate_score((i, j), direction, occupier)
+                        if occupier is self.get_other_player(self.player):
+                            score -= self.evaluate_score((i, j), direction, occupier)
+            if DEBUG:
+                self.print_board()
+                print("Cutoff: {}".format(score))
+            return score
 
 
 # ------------------------ negamax, alpha-beta, fail-soft
 
 def negamax_play(alpha, beta, depth_left, state):
-    if state.check_game_over():
-        return state.evaluate_end(depth_left), state
-    if not depth_left:
-        return state.evaluate_cutoff(), state
+    if state.check_game_over() or not depth_left:
+        return state.evaluate(), state
     states = state.get_next_states()
     best_state = states[0]
     best_score = -INF
@@ -338,16 +333,28 @@ def main():
 
     BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
 
-    WIN_SCORE = 10 * BOARD_SIZE
+    WIN_SCORE = float("inf")
     TIE_SCORE = 0
     LOSE_SCORE = - WIN_SCORE
 
-    play_game()
+    # play_game()
 
 
 if __name__ == "__main__":
     main()
-
+    MAX_DEPTH = 3
+    state = GameState()
+    state.player = NOUGHT
+    state.state = [
+        " ", " ", " ", " ", " ", " ", " ",
+        " ", " ", " ", " ", " ", " ", " ",
+        " ", " ", " ", " ", " ", " ", " ",
+        " ", " ", " ", " ", " ", " ", " ",
+        "X", " ", " ", " ", " ", " ", " ",
+        "X", " ", " ", "O", "O", "O", " "]
+    state.print_board()
+    state = take_turn_ai(state, MINIMAX)
+    state.print_board()
 
 # ----------------- negamax, list comprehension
 #
