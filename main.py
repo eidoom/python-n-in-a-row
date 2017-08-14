@@ -13,66 +13,23 @@ NO = ("n", "N", "No", "no")
 
 INF = float('inf')
 
-WIN_SCORE = INF
-TIE_SCORE = 0
-LOSE_SCORE = - WIN_SCORE
-
 BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
 
 FIRST_PLAYER = CROSS
 
+FIRST_TURN_RANDOM = True
+
 MINIMAX = "minimax"
 RANDOM = "random"
 
-SIMPLE_EVALUATOR = False
+SIMPLE_EVALUATOR = 1
 
-parser = ArgumentParser()
+DEBUG = 0
 
-parser.add_argument("-a", "--ai", type=str, default="{}".format(MINIMAX),
-                    help="Set the computer AI: {} or {}".format(RANDOM, MINIMAX))
-parser.add_argument("-y", "--board-height", type=int, default=3,
-                    help="Set the board height (vertical side length.)")
-parser.add_argument("-x", "--board-width", type=int, default=3,
-                    help="Set the board width (horizontal side length).")
-parser.add_argument("-s", "--square-board-side-length", type=int, default=None,
-                    help="Set up a square board of desired side length (overrules other size settings).")
-parser.add_argument("-n", "--row-length", type=int, default=3,
-                    help="Set the game victory row length.")
-parser.add_argument("-d", "--max-depth", type=int, default=10,
-                    help="Set the AI maximum search depth (higher means more difficult opponent).")
-parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
-parser.add_argument("-q", "--quiet", action="store_true", help="Turn off excess verbosity.")
-
-args = parser.parse_args()
-
-BOARD_WIDTH = args.board_width
-BOARD_HEIGHT = args.board_height
-ROW_LENGTH = args.row_length
-
-SQUARE_SIZE = args.square_board_side_length
-
-if not (SQUARE_SIZE is None):
-    BOARD_WIDTH = SQUARE_SIZE
-    BOARD_HEIGHT = SQUARE_SIZE
-
-if ROW_LENGTH > max(BOARD_WIDTH, BOARD_HEIGHT):
-    exit("Impossible to win: victory row length too long for board size!")
-
-BOARD_SIZE = BOARD_WIDTH * BOARD_HEIGHT
-
-MAX_DEPTH = args.max_depth
-GRAVITY = args.gravity
-AI = args.ai
-VERBOSE = not args.quiet
-
-FIRST_TURN_RANDOM = True
-
-BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
-
-HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
-DIRECTIONS = HALF_DIRECTIONS + [(-x, -y) for (x, y) in HALF_DIRECTIONS]
+HALF_DIRECTIONS = [[-1, 0], [-1, 1], [0, 1], [1, 1]]
+DIRECTIONS = HALF_DIRECTIONS + [[-x, -y] for [x, y] in HALF_DIRECTIONS]
 
 
 class Outcome(Enum):
@@ -118,50 +75,39 @@ class GameState:
                 return True
         return False
 
+    @staticmethod
+    def get_next_position(position, direction):
+        return [sum(x) for x in zip(position, direction)]
+
     def count_line_length(self, position, direction, occupier, tally):
-        new_position = [sum(x) for x in zip(position, direction)]
+        new_position = self.get_next_position(position, direction)
         if self.check_position(new_position, occupier):
             return self.count_line_length(new_position, direction, occupier, tally + 1)
         else:
             return tally, new_position
 
-    def count_possible_line_length(
-            self, total_length, additional_lengths, position, direction, occupier):
-        if total_length == ROW_LENGTH:
-            return True, additional_lengths
-        for piece in (BLANK, occupier):
-            if self.check_position(position, piece):
-                extra, new_position = self.count_line_length(position, direction, piece, 1)
-                additional_lengths[occupier] += extra
-                return self.count_possible_line_length(
-                    total_length + extra, additional_lengths, new_position, direction, occupier)
-        return False, additional_lengths
-
     def evaluate_score(self, position, direction, occupier):
         if SIMPLE_EVALUATOR:
             return self.count_line_length(position, direction, occupier, 0)[0]
 
-        existing_line_length, position = self.count_line_length(position, direction, occupier, 1)
+        if self.check_position(self.get_next_position(position, [-x for x in direction]), occupier):
+            return 0
 
-        success, additional_lengths = self.count_possible_line_length(
-            existing_line_length, {BLANK: 0, occupier: 0}, position, direction, occupier)
+        existing_length, position = self.count_line_length(position, direction, occupier, 1)
 
-        return (existing_line_length + additional_lengths[occupier]) if success else 0
+        if self.check_position(position, BLANK):
+            additional_length = self.count_line_length(position, direction, BLANK, 1)[0]
+        else:
+            additional_length = 0
 
-    def evaluate_score_blank(self, position, direction):
-        score = 0
-        for player, sign in zip((self.player, self.get_other_player(self.player)), (+1, -1)):
-            success, line_lengths = self.count_possible_line_length(
-                1, {BLANK: 0, player: 0}, position, direction, player)
-            score += sign * line_lengths[player] if success else 0
-        return score
+        return existing_length ** 2 if (existing_length + additional_length) >= ROW_LENGTH else 0
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
             for j, occupier in enumerate(row):
-                if not (occupier is BLANK):
+                if occupier is not BLANK:
                     for direction in DIRECTIONS:
-                        if self.count_line_length((i, j), direction, occupier, 1)[0] == ROW_LENGTH:
+                        if self.count_line_length((i, j), direction, occupier, 1)[0] >= ROW_LENGTH:
                             return occupier
 
     def find_available(self):
@@ -185,38 +131,40 @@ class GameState:
     def get_next_states(self):
         return [GameState(self, move) for move in self.find_available()]
 
-    def evaluate_end(self):
-        return {self.player: WIN_SCORE, self.get_other_player(self.player): LOSE_SCORE,
-                None: TIE_SCORE}[self.check_winner()]
-
-    def evaluate_cutoff(self):
-        score = 0
-        for i, row in enumerate(self.state_two):
-            for j, occupier in enumerate(row):
-                for direction in DIRECTIONS:
-                    for player, sign in zip((self.player, self.get_other_player(self.player)),
-                                            (+1, -1)):
-                        if occupier is player:
-                            score += sign * self.evaluate_score((i, j), direction, occupier)
-                    if occupier is BLANK:
-                        score += self.evaluate_score_blank((i, j), direction)
-        return score
+    def evaluate(self):
+        winner = self.check_winner()
+        if winner is not None:
+            score = {self.player: WIN_SCORE, self.get_other_player(self.player): LOSE_SCORE,
+                     None: TIE_SCORE}[winner]
+            if DEBUG:
+                self.print_board()
+                print("End:    {}".format(score))
+            return score
+        else:
+            score = 0
+            for i, row in enumerate(self.state_two):
+                for j, occupier in enumerate(row):
+                    for direction in DIRECTIONS:
+                        if occupier is self.player:
+                            score += self.evaluate_score((i, j), direction, occupier)
+                        if occupier is self.get_other_player(self.player):
+                            score -= self.evaluate_score((i, j), direction, occupier)
+            if DEBUG:
+                self.print_board()
+                print("Cutoff: {}".format(score))
+            return score
 
 
 # ------------------------ negamax, alpha-beta, fail-soft
 
-
 def negamax_play(alpha, beta, depth_left, state):
-    if state.check_game_over():
-        return state.evaluate_end(), state
-    if depth_left == 0:
-        return state.evaluate_cutoff(), state
+    if state.check_game_over() or not depth_left:
+        return state.evaluate(), state
     states = state.get_next_states()
-    depth_left -= 1
     best_state = states[0]
     best_score = -INF
     for state in states:
-        score = -negamax_play(-beta, -alpha, depth_left, state)[0]
+        score = -negamax_play(-beta, -alpha, depth_left - 1, state)[0]
         if score >= beta:
             return score, state
         elif score > best_score:
@@ -234,6 +182,176 @@ def minimax(state):
     state = negamax_play(alpha, beta, depth_left, state)[1]
     return state
 
+
+# ------------------------
+
+def take_turn_ai(state, decision):
+    print("AI's go:")
+    start_time = clock()
+    if decision is MINIMAX:
+        result = minimax(state)
+    elif decision is RANDOM:
+        result = choice(state.get_next_states())
+    else:
+        exit("Sorry, AI {} is unsupported.".format(AI))
+    if VERBOSE:
+        print("Time: {}".format(clock() - start_time))
+    return result
+
+
+def take_turn_human(state):
+    while True:
+        try:
+            move = int(input("Your go: ")) - 1
+
+            if GRAVITY:
+                available = state.find_available()
+                coords = [(number // BOARD_WIDTH, number % BOARD_WIDTH) for number in available]
+                for i, j in coords:
+                    if j == move:
+                        position = i * BOARD_WIDTH + j
+                        return GameState(state, position)
+
+            else:
+                if move in state.find_available():
+                    return GameState(state, move)
+
+        except ValueError:
+            print("Really?")
+
+
+def prompt_boolean(prompt):
+    while True:
+        input_char = input(prompt)
+
+        if input_char in NO:
+            return False
+        elif input_char in YES:
+            return True
+        else:
+            print("What?")
+
+
+def play_round(state, start_human):
+    (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
+
+    if FIRST_TURN_RANDOM and (not start_human):
+        state = take_turn_ai(state, RANDOM)
+        state.print_board()
+
+    while True:
+
+        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
+
+        state.print_board()
+
+        if state.check_game_over():
+            break
+
+    winner = state.check_winner()
+
+    return {player_human: Outcome.HUMAN, player_ai: Outcome.AI, None: Outcome.TIE}[winner]
+
+
+def play_game():
+    tallies = {outcome: 0 for outcome in Outcome}
+
+    while True:
+        state = GameState()
+        state.print_board()
+
+        start_human = prompt_boolean("Wanna start? ")
+
+        winner = play_round(state, start_human)
+
+        print(winner.congratulations())
+        tallies[winner] += 1
+
+        if not prompt_boolean("\nPlay again? "):
+            break
+
+    print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*[tallies[outcome] for outcome in Outcome]))
+
+
+def main():
+    global BOARD_WIDTH
+    global BOARD_HEIGHT
+    global ROW_LENGTH
+    global BOARD_SIZE
+    global MAX_DEPTH
+    global GRAVITY
+    global VERBOSE
+    global BOARD_SQUARE
+    global AI
+    global WIN_SCORE
+    global TIE_SCORE
+    global LOSE_SCORE
+
+    parser = ArgumentParser()
+
+    parser.add_argument("-a", "--ai", type=str, default="{}".format(MINIMAX),
+                        help="Set the computer AI: {} or {}".format(RANDOM, MINIMAX))
+    parser.add_argument("-y", "--board-height", type=int, default=3,
+                        help="Set the board height (vertical side length.)")
+    parser.add_argument("-x", "--board-width", type=int, default=3,
+                        help="Set the board width (horizontal side length).")
+    parser.add_argument("-s", "--square-board-side-length", type=int, default=None,
+                        help="Set up a square board of desired side length "
+                             "(overrules other size settings).")
+    parser.add_argument("-n", "--row-length", type=int, default=3,
+                        help="Set the game victory row length.")
+    parser.add_argument("-d", "--max-depth", type=int, default=10,
+                        help="Set the AI maximum search depth "
+                             "(higher means more difficult opponent).")
+    parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Turn off excess verbosity.")
+
+    args = parser.parse_args()
+
+    BOARD_WIDTH = args.board_width
+    BOARD_HEIGHT = args.board_height
+    ROW_LENGTH = args.row_length
+
+    SQUARE_SIZE = args.square_board_side_length
+
+    if not (SQUARE_SIZE is None):
+        BOARD_WIDTH = SQUARE_SIZE
+        BOARD_HEIGHT = SQUARE_SIZE
+
+    if ROW_LENGTH > max(BOARD_WIDTH, BOARD_HEIGHT):
+        exit("Impossible to win: victory row length too long for board size!")
+
+    BOARD_SIZE = BOARD_WIDTH * BOARD_HEIGHT
+
+    MAX_DEPTH = args.max_depth
+    GRAVITY = args.gravity
+    AI = args.ai
+    VERBOSE = not args.quiet
+
+    BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
+
+    WIN_SCORE = float("inf")
+    TIE_SCORE = 0
+    LOSE_SCORE = - WIN_SCORE
+
+    # play_game()
+
+
+if __name__ == "__main__":
+    main()
+    MAX_DEPTH = 3
+    state = GameState()
+    state.player = NOUGHT
+    state.state = [
+        " ", " ", " ", " ", " ", " ", " ",
+        " ", " ", " ", " ", " ", " ", " ",
+        " ", " ", " ", " ", " ", " ", " ",
+        " ", " ", " ", " ", " ", " ", " ",
+        "X", " ", " ", " ", " ", " ", " ",
+        "X", " ", " ", "O", "O", "O", " "]
+    state.print_board()
+    state = take_turn_ai(state, MINIMAX)
+    state.print_board()
 
 # ----------------- negamax, list comprehension
 #
@@ -383,99 +501,3 @@ def minimax(state):
 #
 #
 # -------------------------
-
-
-def take_turn_ai(state, decision):
-    print("AI's go:")
-    start_time = clock()
-    if decision is MINIMAX:
-        result = minimax(state)
-    elif decision is RANDOM:
-        result = choice(state.get_next_states())
-    else:
-        exit("Sorry, AI {} is unsupported.".format(AI))
-    if VERBOSE:
-        print("Time: {}".format(clock() - start_time))
-    return result
-
-
-def take_turn_human(state):
-    while True:
-        try:
-            move = int(input("Your go: ")) - 1
-
-            if GRAVITY:
-                available = state.find_available()
-                coords = [(number // BOARD_WIDTH, number % BOARD_WIDTH) for number in available]
-                for i, j in coords:
-                    if j == move:
-                        position = i * BOARD_WIDTH + j
-                        return GameState(state, position)
-
-            else:
-                if move in state.find_available():
-                    return GameState(state, move)
-
-        except ValueError:
-            print("Really?")
-
-
-def prompt_boolean(prompt):
-    while True:
-        input_char = input(prompt)
-
-        if input_char in NO:
-            return False
-        elif input_char in YES:
-            return True
-        else:
-            print("What?")
-
-
-def play_round(state, start_human):
-    (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
-
-    if FIRST_TURN_RANDOM and (not start_human):
-        state = take_turn_ai(state, RANDOM)
-        state.print_board()
-
-    while True:
-
-        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
-
-        state.print_board()
-
-        if state.check_game_over():
-            break
-
-    winner = state.check_winner()
-
-    return {player_human: Outcome.HUMAN, player_ai: Outcome.AI, None: Outcome.TIE}[winner]
-
-
-def play_game():
-    tallies = {outcome: 0 for outcome in Outcome}
-
-    while True:
-        state = GameState()
-        state.print_board()
-
-        start_human = prompt_boolean("Wanna start? ")
-
-        winner = play_round(state, start_human)
-
-        print(winner.congratulations())
-        tallies[winner] += 1
-
-        if not prompt_boolean("\nPlay again? "):
-            break
-
-    print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*[tallies[outcome] for outcome in Outcome]))
-
-
-def main():
-    play_game()
-
-
-if __name__ == "__main__":
-    main()
