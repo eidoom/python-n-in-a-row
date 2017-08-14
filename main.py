@@ -109,10 +109,7 @@ class GameState:
     @staticmethod
     def check_on_board(position):
         i, j = position
-        if (0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH):
-            return True
-        else:
-            return False
+        return True if ((0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH)) else False
 
     def check_position(self, position, occupier):
         if self.check_on_board(position):
