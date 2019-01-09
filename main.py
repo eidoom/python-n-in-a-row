@@ -6,7 +6,7 @@ from copy import deepcopy
 from enum import Enum
 from random import choice
 from sys import exit
-from time import clock
+from time import perf_counter
 
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
@@ -24,9 +24,10 @@ FIRST_TURN_RANDOM = True
 MINIMAX = "minimax"
 RANDOM = "random"
 
-SIMPLE_EVALUATOR = 1
+# The non-simple evaluator is in development
+SIMPLE_EVALUATOR = True
 
-DEBUG = 0
+DEBUG = False
 
 HALF_DIRECTIONS = [[-1, 0], [-1, 1], [0, 1], [1, 1]]
 DIRECTIONS = HALF_DIRECTIONS + [[-x, -y] for [x, y] in HALF_DIRECTIONS]
@@ -39,6 +40,11 @@ class Outcome(Enum):
 
     def congratulations(self):
         return {Outcome.HUMAN: "Human wins.", Outcome.AI: "AI wins.", Outcome.TIE: "Tie."}[self]
+
+
+def print_board_frame(entries):
+    print(((BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
+          .format(*entries))
 
 
 class GameState:
@@ -60,8 +66,8 @@ class GameState:
     def print_board(self):
         column_numbers = (("  {}  " * BOARD_WIDTH).format(
             *[(i + 1) for i in range(BOARD_WIDTH)])) + "\n" if GRAVITY else ""
-        print((column_numbers + (BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
-              .format(*[self.state[i] for i in range(BOARD_SIZE)]))
+        print(column_numbers)
+        print_board_frame([self.state[i] for i in range(BOARD_SIZE)])
 
     @staticmethod
     def check_on_board(position):
@@ -79,35 +85,46 @@ class GameState:
     def get_next_position(position, direction):
         return [sum(x) for x in zip(position, direction)]
 
-    def count_line_length(self, position, direction, occupier, tally):
+    # def count_line_length(self, position, direction, occupier, tally):
+    #     new_position = self.get_next_position(position, direction)
+    #     if self.check_position(new_position, occupier):
+    #         return self.count_line_length(new_position, direction, occupier, tally + 1)
+    #     else:
+    #         return tally, new_position
+
+    def count_line_length_with_cutoff(self, position, direction, occupier, tally):
+        if tally == ROW_LENGTH:
+            return tally, position
         new_position = self.get_next_position(position, direction)
         if self.check_position(new_position, occupier):
-            return self.count_line_length(new_position, direction, occupier, tally + 1)
+            return self.count_line_length_with_cutoff(new_position, direction, occupier, tally + 1)
         else:
             return tally, new_position
 
     def evaluate_score(self, position, direction, occupier):
         if SIMPLE_EVALUATOR:
-            return self.count_line_length(position, direction, occupier, 0)[0]
-
-        if self.check_position(self.get_next_position(position, [-x for x in direction]), occupier):
-            return 0
-
-        existing_length, position = self.count_line_length(position, direction, occupier, 1)
-
-        if self.check_position(position, BLANK):
-            additional_length = self.count_line_length(position, direction, BLANK, 1)[0]
-        else:
-            additional_length = 0
-
-        return existing_length ** 2 if (existing_length + additional_length) >= ROW_LENGTH else 0
+            # This doesn't favour earlier wins. Really want score to be current length of potentially winning lines.
+            # nb This is only an issue if ROW_LENGTH<SIDE_LENGTH
+            return self.count_line_length_with_cutoff(position, direction, occupier, 0)[0]
+        # else:
+        #     if self.check_position(self.get_next_position(position, [-x for x in direction]), occupier):
+        #         return 0
+        #
+        #     existing_length, position = self.count_line_length(position, direction, occupier, 1)
+        #
+        #     if self.check_position(position, BLANK):
+        #         additional_length = self.count_line_length(position, direction, BLANK, 1)[0]
+        #     else:
+        #         additional_length = 0
+        #
+        #     return existing_length ** 2 if (existing_length + additional_length) >= ROW_LENGTH else 0
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
             for j, occupier in enumerate(row):
                 if occupier is not BLANK:
                     for direction in DIRECTIONS:
-                        if self.count_line_length((i, j), direction, occupier, 1)[0] >= ROW_LENGTH:
+                        if self.count_line_length_with_cutoff((i, j), direction, occupier, 1)[0] >= ROW_LENGTH:
                             return occupier
 
     def find_available(self):
@@ -138,7 +155,7 @@ class GameState:
                      None: TIE_SCORE}[winner]
             if DEBUG:
                 self.print_board()
-                print("End:    {}".format(score))
+                print(f"End:    {score}")
             return score
         else:
             score = 0
@@ -151,7 +168,7 @@ class GameState:
                             score -= self.evaluate_score((i, j), direction, occupier)
             if DEBUG:
                 self.print_board()
-                print("Cutoff: {}".format(score))
+                print(f"Cutoff: {score}")
             return score
 
 
@@ -187,15 +204,15 @@ def minimax(state):
 
 def take_turn_ai(state, decision):
     print("AI's go:")
-    start_time = clock()
+    start_time = perf_counter()
     if decision is MINIMAX:
         result = minimax(state)
     elif decision is RANDOM:
         result = choice(state.get_next_states())
     else:
-        exit("Sorry, AI {} is unsupported.".format(AI))
+        exit(f"Sorry, AI {AI} is unsupported.")
     if VERBOSE:
-        print("Time: {}".format(clock() - start_time))
+        print(f"Time: {perf_counter() - start_time}")
     return result
 
 
@@ -289,8 +306,8 @@ def main():
 
     parser = ArgumentParser()
 
-    parser.add_argument("-a", "--ai", type=str, default="{}".format(MINIMAX),
-                        help="Set the computer AI: {} or {}".format(RANDOM, MINIMAX))
+    parser.add_argument("-a", "--ai", type=str, default=f"{MINIMAX}",
+                        help=f"Set the computer AI: {RANDOM} or {MINIMAX}")
     parser.add_argument("-y", "--board-height", type=int, default=3,
                         help="Set the board height (vertical side length.)")
     parser.add_argument("-x", "--board-width", type=int, default=3,
@@ -300,7 +317,7 @@ def main():
                              "(overrules other size settings).")
     parser.add_argument("-n", "--row-length", type=int, default=3,
                         help="Set the game victory row length.")
-    parser.add_argument("-d", "--max-depth", type=int, default=10,
+    parser.add_argument("-d", "--max-depth", type=int, default=5,
                         help="Set the AI maximum search depth "
                              "(higher means more difficult opponent).")
     parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
@@ -334,24 +351,34 @@ def main():
     TIE_SCORE = 0
     LOSE_SCORE = - WIN_SCORE
 
-    # play_game()
+    print(f"Game initialised with AI {AI} of depth {MAX_DEPTH}, victory row length {ROW_LENGTH}"
+          f" and {'vertical' if GRAVITY else 'horizontal'} board{'' if GRAVITY else ' with square names'}:")
+
+    if not GRAVITY:
+        if BOARD_SIZE < 10:
+            numbers = range(1, BOARD_SIZE + 1)
+        else:
+            numbers = [f" {i}" for i in range(1, 10)] + [str(i) for i in range(10, BOARD_SIZE + 1)]
+        print_board_frame(numbers)
+
+    play_game()
 
 
 if __name__ == "__main__":
     main()
-    MAX_DEPTH = 3
-    state = GameState()
-    state.player = NOUGHT
-    state.state = [
-        " ", " ", " ", " ", " ", " ", " ",
-        " ", " ", " ", " ", " ", " ", " ",
-        " ", " ", " ", " ", " ", " ", " ",
-        " ", " ", " ", " ", " ", " ", " ",
-        "X", " ", " ", " ", " ", " ", " ",
-        "X", " ", " ", "O", "O", "O", " "]
-    state.print_board()
-    state = take_turn_ai(state, MINIMAX)
-    state.print_board()
+    # MAX_DEPTH = 3
+    # state = GameState()
+    # state.player = NOUGHT
+    # state.state = [
+    #     " ", " ", " ", " ", " ", " ", " ",
+    #     " ", " ", " ", " ", " ", " ", " ",
+    #     " ", " ", " ", " ", " ", " ", " ",
+    #     " ", " ", " ", " ", " ", " ", " ",
+    #     "X", " ", " ", " ", " ", " ", " ",
+    #     "X", " ", " ", "O", "O", "O", " "]
+    # state.print_board()
+    # state = take_turn_ai(state, MINIMAX)
+    # state.print_board()
 
 # ----------------- negamax, list comprehension
 #
