@@ -104,7 +104,7 @@ class GameState:
     def evaluate_score(self, position, direction, occupier):
         if SIMPLE_EVALUATOR:
             # This doesn't favour earlier wins. Really want score to be current length of potentially winning lines.
-            # nb This is only an issue if ROW_LENGTH<SIDE_LENGTH
+            # nb This is only an issue if ROW_LENGTH<SQUARE_SIDE_LENGTH. Also, not designed with GRAVITY=True in mind.
             return self.count_line_length_with_cutoff(position, direction, occupier, 0)[0]
         # else:
         #     if self.check_position(self.get_next_position(position, [-x for x in direction]), occupier):
