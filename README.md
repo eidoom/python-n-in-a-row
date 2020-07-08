@@ -5,5 +5,5 @@
 * For usage, see:
 
 ```
-python3 main.py -h
+./main.py -h
 ```
