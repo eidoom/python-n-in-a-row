@@ -7,3 +7,7 @@
 ```
 ./main.py -h
 ```
+
+## TODO
+
+* Write a working heuristic to improve the evaluator
