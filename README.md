@@ -1,4 +1,4 @@
-# python-n-in-a-row
+# [python-n-in-a-row](https://github.com/eidoom/python-n-in-a-row)
 
 * Needs Python 3.6+
 
