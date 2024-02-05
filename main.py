@@ -75,20 +75,39 @@ class GameState:
         print(column_numbers)
         print_board_frame([self.state[i] for i in range(BOARD_SIZE)])
 
-    def check_position(self, i, j, occupier):
-        return (
-            (0 <= i < BOARD_HEIGHT)
-            and (0 <= j < BOARD_WIDTH)
-            and self.state_two[i][j] == occupier
-        )
+    @staticmethod
+    def check_bounds(i, j):
+        return (0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH)
+
+    def check_match(self, i, j, piece):
+        return self.state_two[i][j] == piece
+
+    def check_full(self, i, j, piece):
+        return self.check_bounds(i, j) and self.check_match(i, j, piece)
 
     def count_line_length(self, i, j, di, dj, occupier, tally=1):
         if tally != ROW_LENGTH:
             ni, nj = (i + di, j + dj)
-            if self.check_position(ni, nj, occupier):
+            if self.check_full(ni, nj, occupier):
                 return self.count_line_length(ni, nj, di, dj, occupier, tally + 1)
-
         return tally
+
+    def score_line(self, i, j, di, dj, occupier, tally=1):
+        ni, nj = (i + di, j + dj)
+        valid = self.check_bounds(ni, nj)
+
+        if tally != ROW_LENGTH and valid and self.check_match(ni, nj, occupier):
+            return self.score_line(ni, nj, di, dj, occupier, tally + 1)
+
+        mi = ni - tally * di
+        mj = nj - tally * dj
+
+        if (valid and self.check_match(ni, nj, BLANK)) or (
+            self.check_full(mi, mj, BLANK)
+        ):
+            return tally
+
+        return 0
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
@@ -133,33 +152,19 @@ class GameState:
         if winner is not None:
             score = WIN_SCORE if winner == self.player else LOSE_SCORE
 
-            if DEBUG:
-                self.print_board()
-                print(f"Score:  {score}")
-                print(f"Winner: {winner}")
-
         else:
-            if DEBUG:
-                print()
-
             score = 0
             for i, row in enumerate(self.state_two):
                 for j, occupier in enumerate(row):
                     if occupier != BLANK:
                         for direction in HALF_DIRECTIONS:
-                            n = self.count_line_length(i, j, *direction, occupier)
+                            score += (
+                                1 if occupier == self.player else -1
+                            ) * self.score_line(i, j, *direction, occupier)
 
-                            if n > 1:
-                                if DEBUG:
-                                    print(
-                                        f"counting {occupier} on {(i,j)} going {direction}: {n}"
-                                    )
-
-                                score += n if occupier == self.player else -n
-
-            if DEBUG:
-                self.print_board()
-                print(f"Score: {score}")
+        if DEBUG:
+            self.print_board()
+            print(f"Score: {score}")
 
         return score
 
@@ -192,9 +197,7 @@ def minimax(state):
     alpha = -INF  # upper bound
     beta = INF  # lower bound
     depth_left = MAX_DEPTH
-    score, state = negamax_play(alpha, beta, depth_left, state)
-    if DEBUG:
-        print(HR + f"\nbest score: {score}")
+    _, state = negamax_play(alpha, beta, depth_left, state)
     return state
 
 
@@ -208,7 +211,7 @@ def take_turn_ai(state, decision):
 
     if DEBUG:
         print(HR)
-        print(f"Outcomes after {MAX_DEPTH} moves")
+        print(f"Outcomes after at most {MAX_DEPTH} moves")
 
     if decision == MINIMAX:
         result = minimax(state)
