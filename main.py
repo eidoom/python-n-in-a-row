@@ -26,11 +26,8 @@ FIRST_TURN_RANDOM = True
 MINIMAX = "minimax"
 RANDOM = "random"
 
-# The non-simple evaluator is in development
-SIMPLE_EVALUATOR = True
-
-HALF_DIRECTIONS = [[-1, 0], [-1, 1], [0, 1], [1, 1]]
-DIRECTIONS = HALF_DIRECTIONS + [[-x, -y] for [x, y] in HALF_DIRECTIONS]
+HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
+DIRECTIONS = HALF_DIRECTIONS + [(-x, -y) for (x, y) in HALF_DIRECTIONS]
 
 
 class Outcome(Enum):
@@ -59,6 +56,7 @@ class GameState:
             self.state = deepcopy(previous_state.state)
             self.state[move] = previous_state.player
             self.player = self.get_other_player(previous_state.player)
+
         self.state_two = [
             [self.state[BOARD_WIDTH * i + j] for j in range(BOARD_WIDTH)]
             for i in range(BOARD_HEIGHT)
@@ -85,6 +83,7 @@ class GameState:
 
     def check_position(self, position, occupier):
         if self.check_on_board(position):
+            # position inside board bounds
             i, j = position
             if self.state_two[i][j] is occupier:
                 return True
@@ -102,38 +101,24 @@ class GameState:
     #         return tally, new_position
 
     def count_line_length_with_cutoff(self, position, direction, occupier, tally):
-        if tally == ROW_LENGTH:
-            return tally, position
-        new_position = self.get_next_position(position, direction)
-        if self.check_position(new_position, occupier):
-            return self.count_line_length_with_cutoff(
-                new_position, direction, occupier, tally + 1
-            )
-        else:
-            return tally, new_position
+        if tally != ROW_LENGTH:
+            new_position = self.get_next_position(position, direction)
+            if self.check_position(new_position, occupier):
+                return self.count_line_length_with_cutoff(
+                    new_position, direction, occupier, tally + 1
+                )
+
+        return tally
 
     def evaluate_score(self, position, direction, occupier):
-        if SIMPLE_EVALUATOR:
-            # This doesn't favour earlier wins. Really want score to be current length of potentially winning lines.
-            # nb This is only an issue if ROW_LENGTH<SQUARE_SIDE_LENGTH. Also, not designed with GRAVITY=True in mind.
-            return self.count_line_length_with_cutoff(
-                position,
-                direction,
-                occupier,
-                0,
-            )[0]
-        # else:
-        #     if self.check_position(self.get_next_position(position, [-x for x in direction]), occupier):
-        #         return 0
-        #
-        #     existing_length, position = self.count_line_length(position, direction, occupier, 1)
-        #
-        #     if self.check_position(position, BLANK):
-        #         additional_length = self.count_line_length(position, direction, BLANK, 1)[0]
-        #     else:
-        #         additional_length = 0
-        #
-        #     return existing_length ** 2 if (existing_length + additional_length) >= ROW_LENGTH else 0
+        # This doesn't favour earlier wins. Really want score to be current length of potentially winning lines.
+        # nb This is only an issue if ROW_LENGTH < SQUARE_SIDE_LENGTH. Also, not designed with GRAVITY = True in mind.
+        return self.count_line_length_with_cutoff(
+            position,
+            direction,
+            occupier,
+            0,
+        )
 
     def check_winner(self):
         for i, row in enumerate(self.state_two):
@@ -143,7 +128,7 @@ class GameState:
                         if (
                             self.count_line_length_with_cutoff(
                                 (i, j), direction, occupier, 1
-                            )[0]
+                            )
                             >= ROW_LENGTH
                         ):
                             return occupier
@@ -151,7 +136,8 @@ class GameState:
     def find_available(self):
         if self.check_winner() in [NOUGHT, CROSS]:
             return []
-        elif GRAVITY:
+
+        if GRAVITY:
             last_top_square = BOARD_SIZE - BOARD_WIDTH
             top_squares = self.state[:last_top_square]
             bottom_row = self.state[last_top_square:]
@@ -204,6 +190,7 @@ class GameState:
 
 
 def negamax_play(alpha, beta, depth_left, state):
+    # https://www.chessprogramming.org/Alpha-Beta#Outside_the_Bounds
     if state.check_game_over() or not depth_left:
         return state.evaluate(), state
     states = state.get_next_states()
@@ -212,12 +199,13 @@ def negamax_play(alpha, beta, depth_left, state):
     for state in states:
         score = -negamax_play(-beta, -alpha, depth_left - 1, state)[0]
         if score >= beta:
+            # fail-soft beta-cutoff
             return score, state
         elif score > best_score:
             best_score = score
+            best_state = state
             if score > alpha:
                 alpha = score
-                best_state = state
     return best_score, best_state
 
 
@@ -240,7 +228,6 @@ def take_turn_ai(state, decision):
     if DEBUG:
         print(HR)
         print(f"Outcomes after {MAX_DEPTH} moves")
-        print("Higher score is always better for human player")
 
     if decision is MINIMAX:
         result = minimax(state)
@@ -478,166 +465,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    # MAX_DEPTH = 3
-    # state = GameState()
-    # state.player = NOUGHT
-    # state.state = [
-    #     " ", " ", " ", " ", " ", " ", " ",
-    #     " ", " ", " ", " ", " ", " ", " ",
-    #     " ", " ", " ", " ", " ", " ", " ",
-    #     " ", " ", " ", " ", " ", " ", " ",
-    #     "X", " ", " ", " ", " ", " ", " ",
-    #     "X", " ", " ", "O", "O", "O", " "]
-    # state.print_board()
-    # state = take_turn_ai(state, MINIMAX)
-    # state.print_board()
-
-# ----------------- negamax, list comprehension
-#
-# def negamax_play(state):
-#     if state.check_game_over():
-#         return -evaluate(state)
-#     return min([-negamax_play(board_state) for board_state in state.get_next_states()])
-#
-#
-# def minimax(state):
-#     return max([(board_state, negamax_play(board_state))
-#                 for board_state in state.get_next_states()],
-#                key=lambda x: x[1])[0]
-
-# ----------------- negamax, map
-#
-# def negamax_play(state):
-#     if state.check_game_over():
-#         return -evaluate(state)
-#     return min(map(lambda board_state: -negamax_play(board_state), state.get_next_states()))
-#
-#
-# def minimax(state):
-#     return max(map(lambda board_state: (board_state, negamax_play(board_state)),
-#                    state.get_next_states()), key=lambda x: x[1])[0]
-
-# --------------------- minimax, concise, list comp.
-
-# def min_play(state):
-#     if state.check_game_over():
-#         return -evaluate(state)
-#     return min([max_play(board_state) for board_state in state.get_next_states()])
-#
-#
-# def max_play(state):
-#     if state.check_game_over():
-#         return evaluate(state)
-#     return max([min_play(board_state) for board_state in state.get_next_states()])
-#
-#
-# def minimax(state):
-#     return max([(board_state, min_play(board_state))
-#                 for board_state in state.get_next_states()],
-#                key=lambda x: x[1])[0]
-
-# ------------------------ negamax, alpha-beta, fail-hard
-#
-# def negamax_play(alpha, beta, state):
-#     if state.check_game_over():
-#         return evaluate(state), state
-#     states = state.get_next_states()
-#     best_state = states[0]
-#     for state in states:
-#         score = -negamax_play(-beta, -alpha, state)[0]
-#         if score >= beta:
-#             return beta, state
-#         elif score > alpha:
-#             alpha = score
-#             best_state = state
-#     return alpha, best_state
-#
-#
-# def minimax(state):
-#     alpha = -INF
-#     beta = INF
-#     state = negamax_play(alpha, beta, state)[1]
-#     return state
-
-# ------------------------ minimax, standard
-
-# def min_play(state):
-#     if state.check_game_over():
-#         return -evaluate(state)
-#     states = state.get_next_states()
-#     best_score = INF
-#     for state in states:
-#         score = max_play(state)
-#         if score < best_score:
-#             # best_states = state
-#             best_score = score
-#     return best_score
-#
-#
-# def max_play(state):
-#     if state.check_game_over():
-#         return evaluate(state)
-#     states = state.get_next_states()
-#     best_score = INF
-#     for state in states:
-#         score = min_play(state)
-#         if score > best_score:
-#             # best_state = state
-#             best_score = score
-#     return best_score
-#
-#
-# def minimax(state):
-#     states = state.get_next_states()
-#     best_state = states[0]
-#     best_score = -INF
-#     for state in states:
-#         score = min_play(state)
-#         if score > best_score:
-#             best_state = state
-#             best_score = score
-#     return best_state
-
-# ------------------------- minimax, alpha-beta
-#
-# def min_play(alpha, beta, state):
-#     if state.check_game_over():
-#         return -evaluate(state), state
-#     else:
-#         states = state.get_next_states()
-#         best_state = states[0]
-#         for state in states:
-#             score = max_play(alpha, beta, state)[0]
-#             if score <= alpha:
-#                 return alpha, state
-#             elif score < beta:
-#                 best_state = state
-#                 beta = score
-#         return beta, best_state
-#
-#
-# def max_play(alpha, beta, state):
-#     if state.check_game_over():
-#         return evaluate(state), state
-#     else:
-#         states = state.get_next_states()
-#         best_state = states[0]
-#         for state in states:
-#             score = min_play(alpha, beta, state)[0]
-#             if score >= beta:
-#                 return beta, state
-#             elif score > alpha:
-#                 best_state = state
-#                 alpha = score
-#         return alpha, best_state
-#
-#
-# def minimax(state):
-#     alpha = -INF
-#     beta = INF
-#     state = min_play(alpha, beta, state)[1]
-#     return state
-#
-#
-# -------------------------
