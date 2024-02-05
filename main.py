@@ -8,6 +8,8 @@ from random import choice
 from sys import exit
 from time import perf_counter
 
+HR = "-" * 20
+
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
 
@@ -26,8 +28,6 @@ RANDOM = "random"
 
 # The non-simple evaluator is in development
 SIMPLE_EVALUATOR = True
-
-DEBUG = False
 
 HALF_DIRECTIONS = [[-1, 0], [-1, 1], [0, 1], [1, 1]]
 DIRECTIONS = HALF_DIRECTIONS + [[-x, -y] for [x, y] in HALF_DIRECTIONS]
@@ -192,11 +192,11 @@ class GameState:
                     for direction in DIRECTIONS:
                         if occupier is self.player:
                             score += self.evaluate_score((i, j), direction, occupier)
-                        if occupier is self.get_other_player(self.player):
+                        elif occupier is self.get_other_player(self.player):
                             score -= self.evaluate_score((i, j), direction, occupier)
             if DEBUG:
                 self.print_board()
-                print(f"Cutoff: {score}")
+                print(f"Score: {score}")
             return score
 
 
@@ -234,15 +234,27 @@ def minimax(state):
 
 def take_turn_ai(state, decision):
     print("AI's go:")
+
     start_time = perf_counter()
+
+    if DEBUG:
+        print(HR)
+        print(f"Outcomes after {MAX_DEPTH} moves")
+        print("Higher score is always better for human player")
+
     if decision is MINIMAX:
         result = minimax(state)
     elif decision is RANDOM:
         result = choice(state.get_next_states())
     else:
         exit(f"Sorry, AI {AI} is unsupported.")
+
+    if DEBUG:
+        print(HR)
+
     if VERBOSE:
         print(f"Time: {perf_counter() - start_time:.3f}s")
+
     return result
 
 
@@ -341,7 +353,7 @@ def get_args():
         "-a",
         "--ai",
         type=str,
-        default=f"{MINIMAX}",
+        default=MINIMAX,
         help=f"Set the computer AI: {RANDOM} or {MINIMAX}",
     )
     parser.add_argument(
@@ -393,23 +405,30 @@ def get_args():
         action="store_true",
         help="Turn off excess verbosity.",
     )
+    parser.add_argument(
+        "-v",
+        "--debug",
+        action="store_true",
+        help="Turn on debugging output.",
+    )
 
     return parser.parse_args()
 
 
 def main():
-    global BOARD_WIDTH
-    global BOARD_HEIGHT
-    global ROW_LENGTH
-    global BOARD_SIZE
-    global MAX_DEPTH
-    global GRAVITY
-    global VERBOSE
-    global BOARD_SQUARE
     global AI
-    global WIN_SCORE
-    global TIE_SCORE
+    global BOARD_HEIGHT
+    global BOARD_SIZE
+    global BOARD_SQUARE
+    global BOARD_WIDTH
+    global DEBUG
+    global GRAVITY
     global LOSE_SCORE
+    global MAX_DEPTH
+    global ROW_LENGTH
+    global TIE_SCORE
+    global VERBOSE
+    global WIN_SCORE
 
     args = get_args()
 
@@ -432,6 +451,7 @@ def main():
     GRAVITY = args.gravity
     AI = args.ai
     VERBOSE = not args.quiet
+    DEBUG = args.debug
 
     BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
 
