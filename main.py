@@ -145,17 +145,17 @@ class GameState:
             score = 0
             for i, row in enumerate(self.state_two):
                 for j, occupier in enumerate(row):
-                    for direction in HALF_DIRECTIONS:
-                        if occupier != BLANK:
-                            n = self.count_line_length(i, j, *direction, occupier)
-                            # could also check next square of line is a blank
-                            if n > 1:
-                                if DEBUG:
-                                    print(
-                                        f"counting {occupier} on {(i,j)} going {direction}: {n}"
-                                    )
+                    if occupier != BLANK:
+                        for direction in HALF_DIRECTIONS:
+                                n = self.count_line_length(i, j, *direction, occupier)
 
-                                score += n if occupier == self.player else -n
+                                if n > 1:
+                                    if DEBUG:
+                                        print(
+                                            f"counting {occupier} on {(i,j)} going {direction}: {n}"
+                                        )
+
+                                    score += n if occupier == self.player else -n
 
             if DEBUG:
                 self.print_board()
