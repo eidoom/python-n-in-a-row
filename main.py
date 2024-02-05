@@ -11,7 +11,7 @@ from time import perf_counter
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
 
-INF = float('inf')
+INF = float("inf")
 
 BLANK = " "
 CROSS = "X"
@@ -39,12 +39,15 @@ class Outcome(Enum):
     TIE = "tie"
 
     def congratulations(self):
-        return {Outcome.HUMAN: "Human wins.", Outcome.AI: "AI wins.", Outcome.TIE: "Tie."}[self]
+        return {
+            Outcome.HUMAN: "Human wins.",
+            Outcome.AI: "AI wins.",
+            Outcome.TIE: "Tie.",
+        }[self]
 
 
 def print_board_frame(entries):
-    print(((BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT)
-          .format(*entries))
+    print(((BOARD_SQUARE * BOARD_WIDTH + "\n") * BOARD_HEIGHT).format(*entries))
 
 
 class GameState:
@@ -56,16 +59,22 @@ class GameState:
             self.state = deepcopy(previous_state.state)
             self.state[move] = previous_state.player
             self.player = self.get_other_player(previous_state.player)
-        self.state_two = [[self.state[BOARD_WIDTH * i + j] for j in range(BOARD_WIDTH)]
-                          for i in range(BOARD_HEIGHT)]
+        self.state_two = [
+            [self.state[BOARD_WIDTH * i + j] for j in range(BOARD_WIDTH)]
+            for i in range(BOARD_HEIGHT)
+        ]
 
     @staticmethod
     def get_other_player(player):
         return {CROSS: NOUGHT, NOUGHT: CROSS}[player]
 
     def print_board(self):
-        column_numbers = (("  {}  " * BOARD_WIDTH).format(
-            *[(i + 1) for i in range(BOARD_WIDTH)])) + "\n" if GRAVITY else ""
+        column_numbers = (
+            (("  {}  " * BOARD_WIDTH).format(*[(i + 1) for i in range(BOARD_WIDTH)]))
+            + "\n"
+            if GRAVITY
+            else ""
+        )
         print(column_numbers)
         print_board_frame([self.state[i] for i in range(BOARD_SIZE)])
 
@@ -97,7 +106,9 @@ class GameState:
             return tally, position
         new_position = self.get_next_position(position, direction)
         if self.check_position(new_position, occupier):
-            return self.count_line_length_with_cutoff(new_position, direction, occupier, tally + 1)
+            return self.count_line_length_with_cutoff(
+                new_position, direction, occupier, tally + 1
+            )
         else:
             return tally, new_position
 
@@ -105,7 +116,12 @@ class GameState:
         if SIMPLE_EVALUATOR:
             # This doesn't favour earlier wins. Really want score to be current length of potentially winning lines.
             # nb This is only an issue if ROW_LENGTH<SQUARE_SIDE_LENGTH. Also, not designed with GRAVITY=True in mind.
-            return self.count_line_length_with_cutoff(position, direction, occupier, 0)[0]
+            return self.count_line_length_with_cutoff(
+                position,
+                direction,
+                occupier,
+                0,
+            )[0]
         # else:
         #     if self.check_position(self.get_next_position(position, [-x for x in direction]), occupier):
         #         return 0
@@ -124,7 +140,12 @@ class GameState:
             for j, occupier in enumerate(row):
                 if occupier is not BLANK:
                     for direction in DIRECTIONS:
-                        if self.count_line_length_with_cutoff((i, j), direction, occupier, 1)[0] >= ROW_LENGTH:
+                        if (
+                            self.count_line_length_with_cutoff(
+                                (i, j), direction, occupier, 1
+                            )[0]
+                            >= ROW_LENGTH
+                        ):
                             return occupier
 
     def find_available(self):
@@ -134,10 +155,14 @@ class GameState:
             last_top_square = BOARD_SIZE - BOARD_WIDTH
             top_squares = self.state[:last_top_square]
             bottom_row = self.state[last_top_square:]
-            available_bottom_squares = [last_top_square + i for i, x in enumerate(bottom_row)
-                                        if x is BLANK]
-            available_top_squares = [i for i, x in enumerate(top_squares) if (x is BLANK)
-                                     and (self.state[i + BOARD_WIDTH] in (CROSS, NOUGHT))]
+            available_bottom_squares = [
+                last_top_square + i for i, x in enumerate(bottom_row) if x is BLANK
+            ]
+            available_top_squares = [
+                i
+                for i, x in enumerate(top_squares)
+                if (x is BLANK) and (self.state[i + BOARD_WIDTH] in (CROSS, NOUGHT))
+            ]
             return available_bottom_squares + available_top_squares
         else:
             return [i for i, x in enumerate(self.state) if x is BLANK]
@@ -151,8 +176,11 @@ class GameState:
     def evaluate(self):
         winner = self.check_winner()
         if winner is not None:
-            score = {self.player: WIN_SCORE, self.get_other_player(self.player): LOSE_SCORE,
-                     None: TIE_SCORE}[winner]
+            score = {
+                self.player: WIN_SCORE,
+                self.get_other_player(self.player): LOSE_SCORE,
+                None: TIE_SCORE,
+            }[winner]
             if DEBUG:
                 self.print_board()
                 print(f"End:    {score}")
@@ -173,6 +201,7 @@ class GameState:
 
 
 # ------------------------ negamax, alpha-beta, fail-soft
+
 
 def negamax_play(alpha, beta, depth_left, state):
     if state.check_game_over() or not depth_left:
@@ -202,6 +231,7 @@ def minimax(state):
 
 # ------------------------
 
+
 def take_turn_ai(state, decision):
     print("AI's go:")
     start_time = perf_counter()
@@ -223,7 +253,10 @@ def take_turn_human(state):
 
             if GRAVITY:
                 available = state.find_available()
-                coords = [(number // BOARD_WIDTH, number % BOARD_WIDTH) for number in available]
+                coords = [
+                    (number // BOARD_WIDTH, number % BOARD_WIDTH)
+                    for number in available
+                ]
                 for i, j in coords:
                     if j == move:
                         position = i * BOARD_WIDTH + j
@@ -257,7 +290,11 @@ def play_round(state, start_human):
         state.print_board()
 
     while True:
-        state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
+        state = (
+            take_turn_human(state)
+            if state.player is player_human
+            else take_turn_ai(state, AI)
+        )
 
         state.print_board()
 
@@ -266,7 +303,11 @@ def play_round(state, start_human):
 
     winner = state.check_winner()
 
-    return {player_human: Outcome.HUMAN, player_ai: Outcome.AI, None: Outcome.TIE}[winner]
+    return {
+        player_human: Outcome.HUMAN,
+        player_ai: Outcome.AI,
+        None: Outcome.TIE,
+    }[winner]
 
 
 def play_game():
@@ -286,7 +327,74 @@ def play_game():
         if not prompt_boolean("\nPlay again? "):
             break
 
-    print("\nHuman: {}\nAI:    {}\nTie:   {}".format(*[tallies[outcome] for outcome in Outcome]))
+    print(
+        "\nHuman: {}\nAI:    {}\nTie:   {}".format(
+            *[tallies[outcome] for outcome in Outcome]
+        )
+    )
+
+
+def get_args():
+    parser = ArgumentParser()
+
+    parser.add_argument(
+        "-a",
+        "--ai",
+        type=str,
+        default=f"{MINIMAX}",
+        help=f"Set the computer AI: {RANDOM} or {MINIMAX}",
+    )
+    parser.add_argument(
+        "-y",
+        "--board-height",
+        type=int,
+        default=3,
+        help="Set the board height (vertical side length.)",
+    )
+    parser.add_argument(
+        "-x",
+        "--board-width",
+        type=int,
+        default=3,
+        help="Set the board width (horizontal side length).",
+    )
+    parser.add_argument(
+        "-s",
+        "--square-board-side-length",
+        type=int,
+        default=None,
+        help="Set up a square board of desired side length "
+        "(overrules other size settings).",
+    )
+    parser.add_argument(
+        "-n",
+        "--row-length",
+        type=int,
+        default=3,
+        help="Set the game victory row length.",
+    )
+    parser.add_argument(
+        "-d",
+        "--max-depth",
+        type=int,
+        default=5,
+        help="Set the AI maximum search depth "
+        "(higher means more difficult opponent).",
+    )
+    parser.add_argument(
+        "-g",
+        "--gravity",
+        action="store_true",
+        help="Turn on gravity.",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Turn off excess verbosity.",
+    )
+
+    return parser.parse_args()
 
 
 def main():
@@ -303,26 +411,7 @@ def main():
     global TIE_SCORE
     global LOSE_SCORE
 
-    parser = ArgumentParser()
-
-    parser.add_argument("-a", "--ai", type=str, default=f"{MINIMAX}",
-                        help=f"Set the computer AI: {RANDOM} or {MINIMAX}")
-    parser.add_argument("-y", "--board-height", type=int, default=3,
-                        help="Set the board height (vertical side length.)")
-    parser.add_argument("-x", "--board-width", type=int, default=3,
-                        help="Set the board width (horizontal side length).")
-    parser.add_argument("-s", "--square-board-side-length", type=int, default=None,
-                        help="Set up a square board of desired side length "
-                             "(overrules other size settings).")
-    parser.add_argument("-n", "--row-length", type=int, default=3,
-                        help="Set the game victory row length.")
-    parser.add_argument("-d", "--max-depth", type=int, default=5,
-                        help="Set the AI maximum search depth "
-                             "(higher means more difficult opponent).")
-    parser.add_argument("-g", "--gravity", action="store_true", help="Turn on gravity.")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Turn off excess verbosity.")
-
-    args = parser.parse_args()
+    args = get_args()
 
     BOARD_WIDTH = args.board_width
     BOARD_HEIGHT = args.board_height
@@ -350,14 +439,18 @@ def main():
     TIE_SCORE = 0
     LOSE_SCORE = -WIN_SCORE
 
-    print(f"Game initialised with AI {AI} of depth {MAX_DEPTH}, victory row length {ROW_LENGTH}"
-          f" and {'vertical' if GRAVITY else 'horizontal'} board{'' if GRAVITY else ' with square names'}:")
+    print(
+        f"Game initialised with AI {AI} of depth {MAX_DEPTH}, victory row length {ROW_LENGTH}"
+        f" and {'vertical' if GRAVITY else 'horizontal'} board{'' if GRAVITY else ' with square names'}:"
+    )
 
     if not GRAVITY:
         if BOARD_SIZE < 10:
             numbers = range(1, BOARD_SIZE + 1)
         else:
-            numbers = [f" {i}" for i in range(1, 10)] + [str(i) for i in range(10, BOARD_SIZE + 1)]
+            numbers = [f" {i}" for i in range(1, 10)] + [
+                str(i) for i in range(10, BOARD_SIZE + 1)
+            ]
         print_board_frame(numbers)
 
     play_game()
@@ -365,6 +458,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
     # MAX_DEPTH = 3
     # state = GameState()
     # state.player = NOUGHT
