@@ -212,7 +212,7 @@ def take_turn_ai(state, decision):
     else:
         exit(f"Sorry, AI {AI} is unsupported.")
     if VERBOSE:
-        print(f"Time: {perf_counter() - start_time}")
+        print(f"Time: {perf_counter() - start_time:.3f}s")
     return result
 
 
@@ -257,7 +257,6 @@ def play_round(state, start_human):
         state.print_board()
 
     while True:
-
         state = take_turn_human(state) if state.player is player_human else take_turn_ai(state, AI)
 
         state.print_board()
@@ -331,7 +330,7 @@ def main():
 
     SQUARE_SIZE = args.square_board_side_length
 
-    if not (SQUARE_SIZE is None):
+    if SQUARE_SIZE is not None:
         BOARD_WIDTH = SQUARE_SIZE
         BOARD_HEIGHT = SQUARE_SIZE
 
@@ -349,7 +348,7 @@ def main():
 
     WIN_SCORE = float("inf")
     TIE_SCORE = 0
-    LOSE_SCORE = - WIN_SCORE
+    LOSE_SCORE = -WIN_SCORE
 
     print(f"Game initialised with AI {AI} of depth {MAX_DEPTH}, victory row length {ROW_LENGTH}"
           f" and {'vertical' if GRAVITY else 'horizontal'} board{'' if GRAVITY else ' with square names'}:")
