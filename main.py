@@ -19,15 +19,12 @@ BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
 
-FIRST_PLAYER = CROSS
-
 FIRST_TURN_RANDOM = True
 
 MINIMAX = "minimax"
 RANDOM = "random"
 
 HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
-DIRECTIONS = HALF_DIRECTIONS + [(-x, -y) for (x, y) in HALF_DIRECTIONS]
 
 
 class Outcome(Enum):
@@ -51,7 +48,7 @@ class GameState:
     def __init__(self, previous_state=None, move=None):
         if previous_state is None:
             self.state = [BLANK] * BOARD_SIZE
-            self.player = FIRST_PLAYER
+            self.player = CROSS  # crosses start
         else:
             self.state = deepcopy(previous_state.state)
             self.state[move] = previous_state.player
@@ -93,43 +90,24 @@ class GameState:
     def get_next_position(position, direction):
         return [sum(x) for x in zip(position, direction)]
 
-    # def count_line_length(self, position, direction, occupier, tally):
-    #     new_position = self.get_next_position(position, direction)
-    #     if self.check_position(new_position, occupier):
-    #         return self.count_line_length(new_position, direction, occupier, tally + 1)
-    #     else:
-    #         return tally, new_position
-
-    def count_line_length_with_cutoff(self, position, direction, occupier, tally):
+    def count_line_length(self, position, direction, occupier, tally=1):
         if tally != ROW_LENGTH:
             new_position = self.get_next_position(position, direction)
             if self.check_position(new_position, occupier):
-                return self.count_line_length_with_cutoff(
+                return self.count_line_length(
                     new_position, direction, occupier, tally + 1
                 )
 
         return tally
 
-    def evaluate_score(self, position, direction, occupier):
-        # This doesn't favour earlier wins. Really want score to be current length of potentially winning lines.
-        # nb This is only an issue if ROW_LENGTH < SQUARE_SIDE_LENGTH. Also, not designed with GRAVITY = True in mind.
-        return self.count_line_length_with_cutoff(
-            position,
-            direction,
-            occupier,
-            0,
-        )
-
     def check_winner(self):
         for i, row in enumerate(self.state_two):
             for j, occupier in enumerate(row):
                 if occupier is not BLANK:
-                    for direction in DIRECTIONS:
+                    for direction in HALF_DIRECTIONS:
                         if (
-                            self.count_line_length_with_cutoff(
-                                (i, j), direction, occupier, 1
-                            )
-                            >= ROW_LENGTH
+                            self.count_line_length((i, j), direction, occupier, 1)
+                            == ROW_LENGTH
                         ):
                             return occupier
 
@@ -161,29 +139,36 @@ class GameState:
 
     def evaluate(self):
         winner = self.check_winner()
+
         if winner is not None:
-            score = {
-                self.player: WIN_SCORE,
-                self.get_other_player(self.player): LOSE_SCORE,
-                None: TIE_SCORE,
-            }[winner]
+            score = WIN_SCORE if winner == self.player else LOSE_SCORE
+
             if DEBUG:
                 self.print_board()
-                print(f"End:    {score}")
-            return score
+                print(f"Score:  {score}")
+                print(f"Winner: {winner}")
+
         else:
             score = 0
             for i, row in enumerate(self.state_two):
                 for j, occupier in enumerate(row):
-                    for direction in DIRECTIONS:
-                        if occupier is self.player:
-                            score += self.evaluate_score((i, j), direction, occupier)
-                        elif occupier is self.get_other_player(self.player):
-                            score -= self.evaluate_score((i, j), direction, occupier)
+                    for direction in HALF_DIRECTIONS:
+                        if occupier != BLANK:
+                            n = self.count_line_length((i, j), direction, occupier)
+                            # could also check next square of line is a blank
+                            if n > 1:
+                                if DEBUG:
+                                    print(
+                                        f"counting {occupier} on {(i,j)} going {direction}: {n}"
+                                    )
+
+                                score += n if occupier == self.player else -n
+
             if DEBUG:
                 self.print_board()
                 print(f"Score: {score}")
-            return score
+
+        return score
 
 
 # ------------------------ negamax, alpha-beta, fail-soft
@@ -193,6 +178,7 @@ def negamax_play(alpha, beta, depth_left, state):
     # https://www.chessprogramming.org/Alpha-Beta#Outside_the_Bounds
     if state.check_game_over() or not depth_left:
         return state.evaluate(), state
+
     states = state.get_next_states()
     best_state = states[0]
     best_score = -INF
