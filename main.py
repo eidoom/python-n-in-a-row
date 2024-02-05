@@ -210,8 +210,8 @@ def negamax_play(alpha, beta, depth_left, state):
 
 
 def minimax(state):
-    alpha = -INF
-    beta = INF
+    alpha = -INF  # upper bound
+    beta = INF  # lower bound
     depth_left = MAX_DEPTH
     state = negamax_play(alpha, beta, depth_left, state)[1]
     return state
