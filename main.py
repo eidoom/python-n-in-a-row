@@ -20,6 +20,7 @@ BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
 
+# to stop crazy analysis for first play when AI goes first
 FIRST_TURN_RANDOM = True
 
 MINIMAX = "minimax"
@@ -296,7 +297,9 @@ def play_game():
         state = GameState()
         state.print_board()
 
-        start_human = prompt_boolean("Wanna start? ")
+        start_human = PIECE == CROSS or (
+            PIECE is None and prompt_boolean("Wanna start? ")
+        )
 
         winner = play_round(state, start_human)
 
@@ -367,6 +370,13 @@ def get_args():
         help="Turn on gravity.",
     )
     parser.add_argument(
+        "-p",
+        "--piece",
+        type=str,
+        choices=(CROSS, NOUGHT),
+        help=f"Choose the piece to play. {CROSS}s start.",
+    )
+    parser.add_argument(
         "-q",
         "--quiet",
         action="store_true",
@@ -396,6 +406,7 @@ def main():
     global TIE_SCORE
     global VERBOSE
     global WIN_SCORE
+    global PIECE
 
     args = get_args()
 
@@ -419,6 +430,8 @@ def main():
     AI = args.ai
     VERBOSE = not args.quiet
     DEBUG = args.debug
+
+    PIECE = args.piece
 
     BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
 
