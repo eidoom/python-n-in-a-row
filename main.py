@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding=UTF-8
 
 from argparse import ArgumentParser
 from copy import deepcopy
@@ -7,6 +6,10 @@ from enum import Enum
 from random import choice
 from sys import exit
 from time import perf_counter
+
+"""
+-d 4 is bugged for play 5,3
+"""
 
 W = 50
 HR = "-" * W
@@ -26,7 +29,7 @@ FIRST_TURN_RANDOM = True
 MINIMAX = "minimax"
 RANDOM = "random"
 
-HALF_DIRECTIONS = [(-1, 0), (-1, 1), (0, 1), (1, 1)]
+HALF_DIRECTIONS = ((-1, 0), (-1, 1), (0, 1), (1, 1))
 
 
 class Outcome(Enum):
@@ -115,7 +118,7 @@ class GameState:
                 if occupier != BLANK:
                     for direction in HALF_DIRECTIONS:
                         if (
-                            self.count_line_length(i, j, *direction, occupier, 1)
+                            self.count_line_length(i, j, *direction, occupier)
                             == ROW_LENGTH
                         ):
                             return occupier
@@ -169,27 +172,32 @@ class GameState:
         return score
 
 
-# ------------------------ negamax, alpha-beta, fail-soft
-
-
-def negamax_play(alpha, beta, depth_left, state):
-    # https://www.chessprogramming.org/Alpha-Beta#Outside_the_Bounds
+def negamax_play(state, alpha, beta, depth_left):
+    """
+    negamax, alpha-beta, fail-soft
+    https://www.chessprogramming.org/Alpha-Beta#Outside_the_Bounds
+    """
     if state.check_game_over() or not depth_left:
         return state.evaluate(), state
 
     states = state.get_next_states()
     best_state = states[0]
     best_score = -INF
+
     for state in states:
-        score = -negamax_play(-beta, -alpha, depth_left - 1, state)[0]
+        score = -negamax_play(state, -beta, -alpha, depth_left - 1)[0]
+
         if score >= beta:
             # fail-soft beta-cutoff
             return score, state
-        elif score > best_score:
+
+        if score > best_score:
             best_score = score
             best_state = state
+
             if score > alpha:
                 alpha = score
+
     return best_score, best_state
 
 
@@ -197,11 +205,8 @@ def minimax(state):
     alpha = -INF  # upper bound
     beta = INF  # lower bound
     depth_left = MAX_DEPTH
-    _, state = negamax_play(alpha, beta, depth_left, state)
-    return state
-
-
-# ------------------------
+    _, new_state = negamax_play(state, alpha, beta, depth_left)
+    return new_state
 
 
 def take_turn_ai(state, decision):
