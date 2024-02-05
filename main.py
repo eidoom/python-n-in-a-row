@@ -8,7 +8,8 @@ from random import choice
 from sys import exit
 from time import perf_counter
 
-HR = "-" * 50
+W = 50
+HR = "-" * W
 
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
@@ -65,7 +66,7 @@ class GameState:
 
     def print_board(self):
         column_numbers = (
-            (("  {}  " * BOARD_WIDTH).format(*[(i + 1) for i in range(BOARD_WIDTH)]))
+            ("  {}  " * BOARD_WIDTH).format(*[(i + 1) for i in range(BOARD_WIDTH)])
             + "\n"
             if GRAVITY
             else ""
@@ -73,30 +74,18 @@ class GameState:
         print(column_numbers)
         print_board_frame([self.state[i] for i in range(BOARD_SIZE)])
 
-    @staticmethod
-    def check_on_board(position):
-        i, j = position
-        return True if ((0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH)) else False
+    def check_position(self, i, j, occupier):
+        return (
+            (0 <= i < BOARD_HEIGHT)
+            and (0 <= j < BOARD_WIDTH)
+            and self.state_two[i][j] == occupier
+        )
 
-    def check_position(self, position, occupier):
-        if self.check_on_board(position):
-            # position inside board bounds
-            i, j = position
-            if self.state_two[i][j] == occupier:
-                return True
-        return False
-
-    @staticmethod
-    def get_next_position(position, direction):
-        return [sum(x) for x in zip(position, direction)]
-
-    def count_line_length(self, position, direction, occupier, tally=1):
+    def count_line_length(self, i, j, di, dj, occupier, tally=1):
         if tally != ROW_LENGTH:
-            new_position = self.get_next_position(position, direction)
-            if self.check_position(new_position, occupier):
-                return self.count_line_length(
-                    new_position, direction, occupier, tally + 1
-                )
+            ni, nj = (i + di, j + dj)
+            if self.check_position(ni, nj, occupier):
+                return self.count_line_length(ni, nj, di, dj, occupier, tally + 1)
 
         return tally
 
@@ -106,7 +95,7 @@ class GameState:
                 if occupier != BLANK:
                     for direction in HALF_DIRECTIONS:
                         if (
-                            self.count_line_length((i, j), direction, occupier, 1)
+                            self.count_line_length(i, j, *direction, occupier, 1)
                             == ROW_LENGTH
                         ):
                             return occupier
@@ -157,7 +146,7 @@ class GameState:
                 for j, occupier in enumerate(row):
                     for direction in HALF_DIRECTIONS:
                         if occupier != BLANK:
-                            n = self.count_line_length((i, j), direction, occupier)
+                            n = self.count_line_length(i, j, *direction, occupier)
                             # could also check next square of line is a blank
                             if n > 1:
                                 if DEBUG:
@@ -204,7 +193,7 @@ def minimax(state):
     depth_left = MAX_DEPTH
     score, state = negamax_play(alpha, beta, depth_left, state)
     if DEBUG:
-        print("~" * 10 + f"\nbest score: {score}")
+        print(HR + f"\nbest score: {score}")
     return state
 
 
@@ -228,7 +217,6 @@ def take_turn_ai(state, decision):
         exit(f"Sorry, AI {AI} is unsupported.")
 
     if DEBUG:
-        result.print_board()
         print(HR)
 
     if VERBOSE:
