@@ -8,7 +8,7 @@ from random import choice
 from sys import exit
 from time import perf_counter
 
-HR = "-" * 20
+HR = "-" * 50
 
 YES = ("", "y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
@@ -82,7 +82,7 @@ class GameState:
         if self.check_on_board(position):
             # position inside board bounds
             i, j = position
-            if self.state_two[i][j] is occupier:
+            if self.state_two[i][j] == occupier:
                 return True
         return False
 
@@ -103,7 +103,7 @@ class GameState:
     def check_winner(self):
         for i, row in enumerate(self.state_two):
             for j, occupier in enumerate(row):
-                if occupier is not BLANK:
+                if occupier != BLANK:
                     for direction in HALF_DIRECTIONS:
                         if (
                             self.count_line_length((i, j), direction, occupier, 1)
@@ -120,16 +120,16 @@ class GameState:
             top_squares = self.state[:last_top_square]
             bottom_row = self.state[last_top_square:]
             available_bottom_squares = [
-                last_top_square + i for i, x in enumerate(bottom_row) if x is BLANK
+                last_top_square + i for i, x in enumerate(bottom_row) if x == BLANK
             ]
             available_top_squares = [
                 i
                 for i, x in enumerate(top_squares)
-                if (x is BLANK) and (self.state[i + BOARD_WIDTH] in (CROSS, NOUGHT))
+                if (x == BLANK) and (self.state[i + BOARD_WIDTH] in (CROSS, NOUGHT))
             ]
             return available_bottom_squares + available_top_squares
         else:
-            return [i for i, x in enumerate(self.state) if x is BLANK]
+            return [i for i, x in enumerate(self.state) if x == BLANK]
 
     def check_game_over(self):
         return not self.find_available()
@@ -149,6 +149,9 @@ class GameState:
                 print(f"Winner: {winner}")
 
         else:
+            if DEBUG:
+                print()
+
             score = 0
             for i, row in enumerate(self.state_two):
                 for j, occupier in enumerate(row):
@@ -199,7 +202,9 @@ def minimax(state):
     alpha = -INF  # upper bound
     beta = INF  # lower bound
     depth_left = MAX_DEPTH
-    state = negamax_play(alpha, beta, depth_left, state)[1]
+    score, state = negamax_play(alpha, beta, depth_left, state)
+    if DEBUG:
+        print("~" * 10 + f"\nbest score: {score}")
     return state
 
 
@@ -215,14 +220,15 @@ def take_turn_ai(state, decision):
         print(HR)
         print(f"Outcomes after {MAX_DEPTH} moves")
 
-    if decision is MINIMAX:
+    if decision == MINIMAX:
         result = minimax(state)
-    elif decision is RANDOM:
+    elif decision == RANDOM:
         result = choice(state.get_next_states())
     else:
         exit(f"Sorry, AI {AI} is unsupported.")
 
     if DEBUG:
+        result.print_board()
         print(HR)
 
     if VERBOSE:
@@ -277,7 +283,7 @@ def play_round(state, start_human):
     while True:
         state = (
             take_turn_human(state)
-            if state.player is player_human
+            if state.player == player_human
             else take_turn_ai(state, AI)
         )
 
