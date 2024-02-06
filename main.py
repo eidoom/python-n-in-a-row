@@ -80,32 +80,27 @@ class GameState:
         print(column_numbers)
         print_board_frame(self.state)
 
-    @staticmethod
-    def check_bounds(i, j):
-        return (0 <= i < BOARD_HEIGHT) and (0 <= j < BOARD_WIDTH)
-
-    def check_match(self, i, j, piece):
-        return self.state_two[i][j] == piece
-
-    def check_full(self, i, j, piece):
-        return self.check_bounds(i, j) and self.check_match(i, j, piece)
+    def check_piece(self, i, j, piece):
+        return (
+            (0 <= i < BOARD_HEIGHT)
+            and (0 <= j < BOARD_WIDTH)
+            and self.state_two[i][j] == piece
+        )
 
     def count_line_length(self, i, j, di, dj, occupier, tally=1):
         if tally != ROW_LENGTH:
             ni, nj = (i + di, j + dj)
-            if self.check_full(ni, nj, occupier):
+            if self.check_piece(ni, nj, occupier):
                 return self.count_line_length(ni, nj, di, dj, occupier, tally + 1)
         return tally
 
     def score_line(self, i, j, di, dj, occupier, tally=1):
         ni, nj = (i + di, j + dj)
-        valid = self.check_bounds(ni, nj)
-
-        if tally != ROW_LENGTH and valid and self.check_match(ni, nj, occupier):
+        if tally != ROW_LENGTH and self.check_piece(ni, nj, occupier):
             return self.score_line(ni, nj, di, dj, occupier, tally + 1)
 
-        if (valid and self.check_match(ni, nj, BLANK)) or (
-            self.check_full(ni - tally * di, nj - tally * dj, BLANK)
+        if self.check_piece(ni, nj, BLANK) or (
+            self.check_piece(ni - tally * di, nj - tally * dj, BLANK)
         ):
             return tally
 
