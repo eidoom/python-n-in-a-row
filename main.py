@@ -7,14 +7,11 @@ from random import choice
 from sys import exit
 from time import perf_counter
 
-"""
--d 4 is bugged for play 5,3
-"""
 
 W = 50
 HR = "-" * W
 
-YES = ("", "y", "Y", "Yes", "yes")
+YES = ("y", "Y", "Yes", "yes")
 NO = ("n", "N", "No", "no")
 
 INF = float("inf")
