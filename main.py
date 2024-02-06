@@ -23,9 +23,6 @@ BLANK = " "
 CROSS = "X"
 NOUGHT = "O"
 
-# to stop crazy analysis for first play when AI goes first
-FIRST_TURN_RANDOM = True
-
 MINIMAX = "minimax"
 RANDOM = "random"
 
@@ -269,10 +266,6 @@ def prompt_boolean(prompt):
 def play_round(state, start_human):
     (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
 
-    if FIRST_TURN_RANDOM and not start_human:
-        state = take_turn_ai(state, RANDOM)
-        state.print_board()
-
     while not state.check_game_over():
         state = (
             take_turn_human(state)
@@ -324,21 +317,24 @@ def get_args():
         "-a",
         "--ai",
         type=str,
+        choices=(RANDOM, MINIMAX),
         default=MINIMAX,
-        help=f"Set the computer AI: {RANDOM} or {MINIMAX}",
+        help=f"Set the computer AI, default {MINIMAX}.",
     )
     parser.add_argument(
         "-y",
         "--board-height",
         type=int,
         default=3,
-        help="Set the board height (vertical side length.)",
+        metavar="H",
+        help="Set the board height (vertical side length).",
     )
     parser.add_argument(
         "-x",
         "--board-width",
         type=int,
         default=3,
+        metavar="W",
         help="Set the board width (horizontal side length).",
     )
     parser.add_argument(
@@ -346,6 +342,7 @@ def get_args():
         "--square-board-side-length",
         type=int,
         default=None,
+        metavar="S",
         help="Set up a square board of desired side length "
         "(overrules other size settings).",
     )
@@ -354,6 +351,7 @@ def get_args():
         "--row-length",
         type=int,
         default=3,
+        metavar="N",
         help="Set the game victory row length.",
     )
     parser.add_argument(
@@ -361,6 +359,7 @@ def get_args():
         "--max-depth",
         type=int,
         default=5,
+        metavar="D",
         help="Set the AI maximum search depth "
         "(higher means more difficult opponent).",
     )
