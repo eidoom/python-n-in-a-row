@@ -104,10 +104,9 @@ class GameState:
         if tally != ROW_LENGTH and self.check_piece(ni, nj, occupier):
             return self.score_line(ni, nj, di, dj, occupier, tally + 1)
 
-        if (
-            tally > 1
-            and self.check_piece(ni, nj, BLANK)
-            or (self.check_piece(i - tally * di, j - tally * dj, BLANK))
+        if tally > 1 and (
+            self.check_piece(ni, nj, BLANK)
+            or self.check_piece(i - tally * di, j - tally * dj, BLANK)
         ):
             # if DEBUG:
             #     print(f"counted")
