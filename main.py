@@ -53,6 +53,9 @@ class GameState:
             self.state[move] = previous_state.player
             self.player = self.get_other_player(previous_state.player)
 
+        self.init_next_state()
+
+    def init_next_state(self):
         self.state_two = [
             [self.state[BOARD_WIDTH * i + j] for j in range(BOARD_WIDTH)]
             for i in range(BOARD_HEIGHT)
@@ -93,8 +96,10 @@ class GameState:
         """
         doesn't consider when the winning blank is the inside blank of a broken line
         """
-
         ni, nj = (i + di, j + dj)
+
+        # if DEBUG and tally>1:
+        #     print(f"@{(i,j)} >{(di,dj)} <{(i - tally * di, j - tally * dj)} t{tally}")
 
         if tally != ROW_LENGTH and self.check_piece(ni, nj, occupier):
             return self.score_line(ni, nj, di, dj, occupier, tally + 1)
@@ -102,8 +107,10 @@ class GameState:
         if (
             tally > 1
             and self.check_piece(ni, nj, BLANK)
-            or (self.check_piece(ni - tally * di, nj - tally * dj, BLANK))
+            or (self.check_piece(i - tally * di, j - tally * dj, BLANK))
         ):
+            # if DEBUG:
+            #     print(f"counted")
             return tally
 
         return 0
@@ -457,8 +464,23 @@ def main():
             ]
         print_board_frame(numbers)
 
-    play_game()
+    if DEBUG:
+        debug()
+    else:
+        play_game()
 
+def debug():
+    state = GameState()
+    state.player = "X"
+    state.state = [
+        "X", " ", " ",
+        " ", " ", " ",
+        " ", " ", "X",
+    ]
+    state.init_next_state()
+    state.evaluate()
+    # state = take_turn_ai(state, MINIMAX)
+    # state.print_board()
 
 if __name__ == "__main__":
     main()
