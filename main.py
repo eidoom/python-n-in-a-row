@@ -92,10 +92,12 @@ class GameState:
             ni, nj = (i + di, j + dj)
             if self.check_piece(ni, nj, occupier):
                 return self.count_line_length(ni, nj, di, dj, occupier, tally + 1)
+
         return tally
 
     def score_line(self, i, j, di, dj, occupier, tally=1):
         ni, nj = (i + di, j + dj)
+
         if tally != ROW_LENGTH and self.check_piece(ni, nj, occupier):
             return self.score_line(ni, nj, di, dj, occupier, tally + 1)
 
