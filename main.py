@@ -70,13 +70,15 @@ class GameState:
 
     def print_board(self):
         column_numbers = (
-            ("  {}  " * BOARD_WIDTH).format(*[(i + 1) for i in range(BOARD_WIDTH)])
-            + "\n"
+            (
+                ("  {}  " * BOARD_WIDTH).format(*[(i + 1) for i in range(BOARD_WIDTH)])
+                + "\n"
+            )
             if GRAVITY
             else ""
         )
         print(column_numbers)
-        print_board_frame([self.state[i] for i in range(BOARD_SIZE)])
+        print_board_frame(self.state)
 
     @staticmethod
     def check_bounds(i, j):
@@ -102,11 +104,8 @@ class GameState:
         if tally != ROW_LENGTH and valid and self.check_match(ni, nj, occupier):
             return self.score_line(ni, nj, di, dj, occupier, tally + 1)
 
-        mi = ni - tally * di
-        mj = nj - tally * dj
-
         if (valid and self.check_match(ni, nj, BLANK)) or (
-            self.check_full(mi, mj, BLANK)
+            self.check_full(ni - tally * di, nj - tally * dj, BLANK)
         ):
             return tally
 
@@ -124,7 +123,7 @@ class GameState:
                             return occupier
 
     def find_available(self):
-        if self.check_winner() in [NOUGHT, CROSS]:
+        if self.check_winner() is not None:
             return []
 
         if GRAVITY:
@@ -137,7 +136,7 @@ class GameState:
             available_top_squares = [
                 i
                 for i, x in enumerate(top_squares)
-                if (x == BLANK) and (self.state[i + BOARD_WIDTH] in (CROSS, NOUGHT))
+                if (x == BLANK) and (self.state[i + BOARD_WIDTH] != BLANK)
             ]
             return available_bottom_squares + available_top_squares
         else:
@@ -156,14 +155,14 @@ class GameState:
             score = WIN_SCORE if winner == self.player else LOSE_SCORE
 
         else:
-            score = 0
-            for i, row in enumerate(self.state_two):
-                for j, occupier in enumerate(row):
-                    if occupier != BLANK:
-                        for direction in HALF_DIRECTIONS:
-                            score += (
-                                1 if occupier == self.player else -1
-                            ) * self.score_line(i, j, *direction, occupier)
+            score = sum(
+                (1 if occupier == self.player else -1)
+                * self.score_line(i, j, *direction, occupier)
+                for i, row in enumerate(self.state_two)
+                for j, occupier in enumerate(row)
+                if occupier != BLANK
+                for direction in HALF_DIRECTIONS
+            )
 
         if DEBUG:
             self.print_board()
@@ -273,11 +272,11 @@ def prompt_boolean(prompt):
 def play_round(state, start_human):
     (player_human, player_ai) = (CROSS, NOUGHT) if start_human else (NOUGHT, CROSS)
 
-    if FIRST_TURN_RANDOM and (not start_human):
+    if FIRST_TURN_RANDOM and not start_human:
         state = take_turn_ai(state, RANDOM)
         state.print_board()
 
-    while True:
+    while not state.check_game_over():
         state = (
             take_turn_human(state)
             if state.player == player_human
@@ -285,9 +284,6 @@ def play_round(state, start_human):
         )
 
         state.print_board()
-
-        if state.check_game_over():
-            break
 
     winner = state.check_winner()
 
@@ -401,6 +397,7 @@ def get_args():
 
 
 def main():
+    # ugly
     global AI
     global BOARD_HEIGHT
     global BOARD_SIZE
