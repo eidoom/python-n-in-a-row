@@ -308,21 +308,25 @@ def play_round(state, start_human):
 def play_game():
     tallies = {outcome: 0 for outcome in Outcome}
 
-    while True:
-        state = GameState()
-        state.print_board()
+    try:
+        while True:
+            state = GameState()
+            state.print_board()
 
-        start_human = PIECE == CROSS or (
-            PIECE is None and prompt_boolean("Wanna start? ")
-        )
+            start_human = PIECE == CROSS or (
+                PIECE is None and prompt_boolean("Wanna start? ")
+            )
 
-        winner = play_round(state, start_human)
+            winner = play_round(state, start_human)
 
-        print(winner.congratulations())
-        tallies[winner] += 1
+            print(winner.congratulations())
+            tallies[winner] += 1
 
-        if not prompt_boolean("\nPlay again? "):
-            break
+            if not prompt_boolean("\nPlay again? "):
+                break
+
+    except KeyboardInterrupt:
+        print()
 
     print(
         "\nHuman: {}\nAI:    {}\nTie:   {}".format(
