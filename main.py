@@ -23,6 +23,8 @@ NOUGHT = "O"
 MINIMAX = "minimax"
 RANDOM = "random"
 
+DEPTH_SCORE = 10
+
 HALF_DIRECTIONS = ((-1, 0), (-1, 1), (0, 1), (1, 1))
 
 
@@ -105,14 +107,18 @@ class GameState:
 
         if valid and total < ROW_LENGTH:
             if self.check_match(ni, nj, occupier):
-                return self.score_line(ni, nj, direction, occupier, tally + 1, total + 1)
+                return self.score_line(
+                    ni, nj, direction, occupier, tally + 1, total + 1
+                )
             if self.check_match(ni, nj, BLANK):
                 return self.score_line(ni, nj, direction, occupier, tally, total + 1)
 
-        if tally > 1 and (
-            total > tally
-            or self.check_match(ni, nj, BLANK)
-            or self.check_piece(*self.shift(i, j, *direction, -tally), BLANK)
+        if tally > 1 and any(
+            [
+                total > tally,
+                valid and self.check_match(ni, nj, BLANK),
+                self.check_piece(*self.shift(i, j, *direction, -tally), BLANK),
+            ]
         ):
             return tally
 
@@ -155,7 +161,7 @@ class GameState:
     def get_next_states(self):
         return [GameState(self, move) for move in self.find_available()]
 
-    def evaluate(self):
+    def evaluate(self, depth_left):
         winner = self.check_winner()
 
         if winner is not None:
@@ -171,6 +177,8 @@ class GameState:
                 for direction in HALF_DIRECTIONS
             )
 
+        score *= DEPTH_SCORE**depth_left
+
         if DEBUG:
             self.print_board()
             print(f"Score: {score}")
@@ -184,7 +192,7 @@ def negamax_play(state, alpha, beta, depth_left):
     https://www.chessprogramming.org/Alpha-Beta#Outside_the_Bounds
     """
     if state.check_game_over() or not depth_left:
-        return state.evaluate(), state
+        return state.evaluate(depth_left), state
 
     states = state.get_next_states()
     best_state = states[0]
@@ -449,7 +457,7 @@ def main():
 
     BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
 
-    WIN_SCORE = float("inf")
+    WIN_SCORE = 10**6
     TIE_SCORE = 0
     LOSE_SCORE = -WIN_SCORE
 
@@ -486,7 +494,7 @@ def debug():
         for el in row
     ]
     state.init_next_state()
-    state.evaluate()
+    state.evaluate(0)
     state = take_turn_ai(state, MINIMAX)
     state.print_board()
 
