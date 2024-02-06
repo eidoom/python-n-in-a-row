@@ -457,7 +457,14 @@ def main():
 
     BOARD_SQUARE = "[ {} ]" if GRAVITY else "[{}]"
 
-    WIN_SCORE = 10**6
+    MAX_SCORE = 100
+    """
+    assume board dimensions (BOARD_WIDTH, BOARD_HEIGHT) and victory length (ROW_LENGTH) such that
+    maximum score before depth multiplier is less than MAX_SCORE
+    then max score after depth multipler is less than MAX_SCORE * DEPTH_SCORE**MAX_DEPTH
+    so that should be safe to use for the WIN_SCORE such that depth multipliers don't overflow it
+    """
+    WIN_SCORE = MAX_SCORE * DEPTH_SCORE**MAX_DEPTH
     TIE_SCORE = 0
     LOSE_SCORE = -WIN_SCORE
 
@@ -475,28 +482,7 @@ def main():
             ]
         print_board_frame(numbers)
 
-    if DEBUG:
-        debug()
-    else:
-        play_game()
-
-
-def debug():
-    state = GameState()
-    state.player = "X"
-    state.state = [
-        el
-        for row in [
-            ["X", " ", " "],
-            [" ", " ", " "],
-            ["X", " ", " "],
-        ]
-        for el in row
-    ]
-    state.init_next_state()
-    state.evaluate(0)
-    state = take_turn_ai(state, MINIMAX)
-    state.print_board()
+    play_game()
 
 
 if __name__ == "__main__":
